@@ -247,7 +247,8 @@ if not st.session_state['is_logged_in']:
 # B. ログイン後のデータ取得
 user_id = st.session_state['current_user']
 df_users = get_all_users()
-user_row = df_users[df_users['user_id'].astype(str) == user_id].iloc[0]
+match_users = df_users[df_users['user_id'].astype(str) == user_id]
+user_row = match_users.iloc[0] if not match_users.empty else pd.Series({"user_id": user_id, "password": "", "target_weight": None, "consecutive_days": 1})
 df_menu = load_menu()
 
 # C. 目標設定画面
