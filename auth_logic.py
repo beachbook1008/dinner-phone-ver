@@ -79,7 +79,10 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         try:
             import requests
             import json
-            json_data = json.dumps(df.to_dict(orient="records"))
+            # 💡 NaN（バグの原因）を、Googleが読めるように空っぽ（None）に変換する処理をプラス！
+            clean_df = df.fillna(pd.NA).replace({pd.NA: None})
+            json_data = json.dumps(clean_df.to_dict(orient="records"))
+
             
             # Googleの最新URLへPOSTで送信
             res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
@@ -251,6 +254,7 @@ match_users = df_users[df_users['user_id'].astype(str) == user_id]
 user_row = match_users.iloc[0] if not match_users.empty else pd.Series({"user_id": user_id, "password": "", "target_weight": None, "consecutive_days": 1})
 df_menu = load_menu()
 
+# C. 目標設定画面
 # C. 目標設定画面
 if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
     st.title(f"📅 目標設定 ({user_id})")
