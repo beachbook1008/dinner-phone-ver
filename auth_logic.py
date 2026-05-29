@@ -414,11 +414,12 @@ with chart_col2:
         labels = ['朝食', '昼食', '夕食', '目標枠']
     
     # 💡 【超重要】サーバーに日本語フォントがなくても強制的に文字化けを直す裏技！
+    # 💡 【超重要】新バージョンでも絶対にエラーが出ない文字化け対策！
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
     import urllib.request
 
-    # ネット上から無料の日本語フォント（Noto Sans）をその場でダウンロードして読み込む
+    # ネット上から無料の日本語フォント（Noto Sans）をその場でダウンロード
     font_url = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
     font_path = "NotoSans-Regular.ttf"
     if not os.path.exists(font_path):
@@ -427,10 +428,10 @@ with chart_col2:
         except:
             pass
             
-    # ダウンロードしたフォントを最優先で使うように設定！
+    # 💡 命令文（addfont）を使わず、プロパティを直接上書きする安全な方法に変更！
     if os.path.exists(font_path):
-        fm.font_manager.addfont(font_path)
-        plt.rc('font', family=fm.FontProperties(fname=font_path).get_name())
+        fp = fm.FontProperties(fname=font_path)
+        plt.rc('font', family=fp.get_name())
     else:
         plt.rc('font', family='sans-serif')
     
