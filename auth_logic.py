@@ -3,9 +3,16 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import os
-takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
 from datetime import datetime
 from dotenv import load_dotenv
+
+# --- アバター・画像の存在チェック ---
+takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
+# 💡 雷さんの単体画像
+rai_avatar = "mii_thunder.jpg" if os.path.exists("mii_thunder.jpg") else "⚡️"
+# 💡 集合写真とツーショット画像
+all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
+takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
 # --- 1. 初期設定 ---
 load_dotenv()
@@ -17,13 +24,10 @@ else:
     st.error("APIキーがないよ！")
     st.stop()
 
-# 💡 自作したstyleとai_configをインポート
 import style
 import ai_config
 
 st.set_page_config(page_title="Dinner Logic DX", layout="wide")
-
-# 💡 別ファイルのおしゃれCSSを適用
 style.apply_custom_css()
 
 # --- 2. データ管理関数 ---
@@ -32,8 +36,6 @@ MENU_FILE = "dinner_list.csv"
 
 def get_all_users():
     cols = ["user_id", "password", "target_weight", "last_update", "consecutive_days"]
-    
-    # 💡 パソコン（ローカル）の時はCSVから、Streamlit Cloudの時はネット上（secrets）から安全に読み込む
     if "user_db" in st.secrets and st.secrets["user_db"]:
         try:
             df = pd.read_csv(st.secrets["user_db"])
@@ -70,7 +72,6 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         
     df.to_csv(USER_FILE, index=False)
     
-    # 🔍 【直接原因を見つけるためのチェック機能】
     if "db_backup_url" not in st.secrets:
         st.error("🚨 エラー理由：StreamlitのSecretsに『db_backup_url』という名前が登録されていません！")
     elif not st.secrets["db_backup_url"]:
@@ -79,15 +80,9 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         try:
             import requests
             import json
-            
-            
             clean_df = df.fillna("")
             json_data = json.dumps(clean_df.to_dict(orient="records"))
-            
-            # Googleの最新URLへPOSTで送信
             res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
-            
-            # Googleから返ってきた結果を画面に直接出す！
             if res.status_code == 200:
                 st.success(f"⭕ Googleへの送信自体は成功しました！Googleからの返事: {res.text}")
             else:
@@ -112,18 +107,14 @@ def calculate_consecutive_days(user_id):
     u_str = str(user_id)
     if u_str not in df['user_id'].astype(str).values:
         return 1
-    
     idx = df[df['user_id'].astype(str) == u_str].index[0]
     last_update_str = df.at[idx, 'last_update']
     current_consecutive = df.at[idx, 'consecutive_days']
-    
     if pd.isna(last_update_str) or pd.isna(current_consecutive):
         return 1
-    
     try:
         last_update = datetime.strptime(last_update_str, "%Y-%m-%d").date()
         today = datetime.now().date()
-        
         if (today - last_update).days == 1:
             return int(current_consecutive) + 1
         elif (today - last_update).days == 0:
@@ -154,25 +145,20 @@ if 'selected_dinner' not in st.session_state:
 if 'selected_dinner_cal' not in st.session_state:
     st.session_state['selected_dinner_cal'] = 0
 
-# 🍪 安全にブラウザからCookieを読み込む
 cookie_user_id = st.context.cookies.get("saved_user_id")
 
-# Cookieが残っていたら自動ログイン
 if not st.session_state['is_logged_in'] and cookie_user_id:
     df = get_all_users()
     match = df[df['user_id'].astype(str) == str(cookie_user_id)]
     if not match.empty:
         user_info = match.iloc[0]
         reset_basic_info_on_month_start(cookie_user_id)
-        
         consecutive_days = calculate_consecutive_days(cookie_user_id)
         save_user(cookie_user_id, user_info['password'], user_info['target_weight'], consecutive_days)
-        
         st.session_state['height'] = float(user_info.get('height', 160.0))
         st.session_state['weight'] = float(user_info.get('weight', 55.0))
         st.session_state['age'] = int(user_info.get('age', 20))
         st.session_state['gender'] = user_info.get('gender', "女子")
-        
         st.session_state['is_logged_in'] = True
         st.session_state['current_user'] = cookie_user_id
         st.rerun()
@@ -182,7 +168,10 @@ if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
         st.markdown("<div style='text-align: center;'><h1 style='color: #ff6b6b;'>📝 新規会員登録</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>新しくアカウントを作成してサンダーさんと一緒にダイエットを始めましょう！</p>", unsafe_allow_html=True)
+            # 💡 新規登録画面の上部にも華やかに集合写真を配置
+            if all_friends_img:
+                st.image(all_friends_img, use_container_width=True, caption="E班メンバー一同でサポートします！")
+            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>新しくアカウントを作成して一緒にダイエットを始めましょう！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 n_id = st.text_input("希望ID", key="reg_id", placeholder="ユーザーID")
@@ -205,7 +194,11 @@ if not st.session_state['is_logged_in']:
     else:
         st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からダイエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>先生との美食ダイエット of ようこそ！</p>", unsafe_allow_html=True)
+            # 💡 【ご要望】ログイン画面のトップにみんなの写真（allfriends.jpg）を表示！
+            if all_friends_img:
+                st.image(all_friends_img, use_container_width=True, caption="デジタル変革実験 E班プロジェクト")
+                
+            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>先生・メンバーとの美食ダイエットへようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 l_id = st.text_input("ユーザーID", key="login_id", placeholder="IDを入力")
@@ -217,19 +210,15 @@ if not st.session_state['is_logged_in']:
                     if not match.empty:
                         user_info = match.iloc[0]
                         reset_basic_info_on_month_start(l_id)
-                        
                         consecutive_days = calculate_consecutive_days(l_id)
                         save_user(l_id, user_info['password'], user_info['target_weight'], consecutive_days)
-                        
                         st.session_state['height'] = float(user_info.get('height', 160.0))
                         st.session_state['weight'] = float(user_info.get('weight', 55.0))
                         st.session_state['age'] = int(user_info.get('age', 20))
                         st.session_state['gender'] = user_info.get('gender', "女子")
-                        
                         st.session_state['is_logged_in'] = True
                         st.session_state['current_user'] = l_id
                         
-                        # 🍪 JavaScriptで安全にCookieに書き込む
                         st.components.v1.html(f"""
                             <script>
                                 document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/; Secure; SameSite=Lax";
@@ -264,13 +253,6 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
     st.stop()
 
 # --- 4. メイン画面の準備 ---
-if os.path.exists("mii_thunder.jpg"):
-    thunder_avatar = "mii_thunder.jpg"
-elif os.path.exists("mii_thunder.png"):
-    thunder_avatar = "mii_thunder.png"
-else:
-    thunder_avatar = "⚡️"
-
 st.title(f"今日からダイエット")
 
 consecutive_days = int(user_row.get('consecutive_days', 1))
@@ -282,8 +264,14 @@ with st.container(border=True):
 
 st.markdown("---")
 
+# --- サイドバーの設定 ---
 with st.sidebar:
-    st.image(thunder_avatar, width=150, caption="みんなでがんばろう")
+    # 💡 【ご要望】高木先生と雷さんのツーショット画像をサイドバー上部にマスコットとして組み込み！
+    if takagi_rai_img:
+        st.image(takagi_rai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
+    else:
+        st.markdown("👥 **チーム高木＆雷**")
+        
     st.header(" ステータス")
     st.success(f"User: {user_id}\nTarget: {user_row['target_weight']}kg")
     
@@ -341,13 +329,14 @@ if b_items or l_items:
 dinner_cal = target_cal - (df_menu[df_menu['display'].isin(b_items)]['cal'].sum() + df_menu[df_menu['display'].isin(l_items)]['cal'].sum())
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
-# --- 6. 自動挨拶（キャラクター分岐対応版） ---
+# --- 6. 自動挨拶（アバター切り替え対応版） ---
 st.divider()
 
+# 💡 【ご要望】キャラクターの選択状態に応じてアバターの画像パスを決定！
 if ai_persona == "高木先生モード":
     current_avatar = takagi_avatar
-elif ai_persona == "サンダーさん (身内ノリ)":
-    current_avatar = thunder_avatar
+elif ai_persona == "雷さん ":
+    current_avatar = rai_avatar  # 👈 ここでmii_thunder.jpgが適用されます！
 else:
     current_avatar = "🤖"
 
@@ -417,6 +406,7 @@ else:
     chat_placeholder = "雷さんに相談"
 
 if user_msg := st.chat_input(chat_placeholder):
+    # 💡 チャットを送信した際にも、選択されたキャラクター画像（mii_thunder.jpgなど）がアイコンになります！
     with st.chat_message("assistant", avatar=current_avatar):
         sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
         prompt = f"{sys_prompt}\n残り{int(dinner_cal)}kcal。質問:{user_msg}"
