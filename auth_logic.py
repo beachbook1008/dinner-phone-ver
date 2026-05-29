@@ -1,7 +1,9 @@
+import time
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import os
+import time
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
 from datetime import datetime
 from dotenv import load_dotenv
@@ -193,12 +195,15 @@ if not st.session_state['is_logged_in']:
                         
                         # 🍪 JavaScriptで安全にCookieに書き込む
                         st.components.v1.html(f"""
-                            <script>
-                                document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/;";
-                            </script>
-                        """, height=0)
+    <script>
+        document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/; Secure; SameSite=Lax";
+    </script>
+""", height=0)
+                           
+                        
                         
                         st.success(f"ログイン成功！おかえりなさい、{l_id}さん ")
+                        time.sleep(0.5)
                         st.rerun()
                     else: 
                         st.error("IDまたはパスワードが間違っています！")
