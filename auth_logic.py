@@ -73,13 +73,16 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     # パソコン用にも保存する（元のまま）
     df.to_csv(USER_FILE, index=False)
     
-    # 💡 【修正点】Googleスプレッドシート連携用の安全なバックアップ送信処理
+    # 💡 【修正】Google Apps ScriptのウェブアプリURLへデータをリアルタイム自動同期する処理
     if "db_backup_url" in st.secrets and st.secrets["db_backup_url"]:
         try:
-            # st.experimental_connection や外部Webhook等、安全に外部シートへデータを投げるリクエスト
             import requests
-            # JSON形式でGoogleスプレッドシート等へバックアップを自動送信
-            requests.post(st.secrets["db_backup_url"], json=df.to_dict(orient="records"), timeout=5)
+            # なぜかデータ形式でエラーが出ないよう、綺麗に整形してGoogle側に一瞬で送信！
+            clean_df = df.copy()
+            clean_df['target_weight'] = pd.to_numeric(clean_df['target_weight'], errors='coerce').fillna(45.0)
+            clean_df['consecutive_days'] = pd.to_numeric(clean_df['consecutive_days'], errors='coerce').fillna(1).astype(int)
+            
+            requests.post(st.secrets["db_backup_url"], json=clean_df.to_dict(orient="records"), timeout=5)
         except:
             pass
 
@@ -241,7 +244,7 @@ df_users = get_all_users()
 user_row = df_users[df_users['user_id'].astype(str) == user_id].iloc[0]
 df_menu = load_menu()
 
-# C. 目標設定画面
+# C. 目楽設定画面
 if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
     st.title(f"📅 目標設定 ({user_id})")
     t_w = st.number_input("今月の目標体重 (kg)", 30.0, 150.0, 52.0)
@@ -334,7 +337,7 @@ st.divider()
 
 if ai_persona == "高木先生モード":
     current_avatar = takagi_avatar
-elif ai_persona == "サンダーさん ":
+elif ai_persona == "サンダーさん (身内ノリ)":
     current_avatar = thunder_avatar
 else:
     current_avatar = "🤖"
