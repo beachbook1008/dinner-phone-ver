@@ -404,14 +404,25 @@ with chart_col2:
     # 💡 グラフ用のデータを準備（残り枠がマイナスの時は0にする）
     left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
     
-    labels = ['朝食', '昼食', '夕食', '残り枠']
-    sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
-    colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
+    raw_labels = ['朝食', '昼食', '夕食', '残り枠']
+    raw_sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
+    raw_colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
     
-    # 全部0（何も入力されていない初期状態）の時はダミーで残り枠100%にする
-    if sum(sizes) == 0:
-        sizes = [0, 0, 0, 100]
-        labels = ['朝食', '昼食', '夕食', '目標枠']
+    # 💡 【文字の重なり解消！】0のデータはグラフの部品から完全に除外する
+    labels = []
+    sizes = []
+    colors = []
+    for s, l, c in zip(raw_sizes, raw_labels, raw_colors):
+        if s > 0:
+            labels.append(l)
+            sizes.append(s)
+            colors.append(c)
+            
+    # 何も入力されていない（または全部0）の時は、スッキリした1つのグレー円にする
+    if len(sizes) == 0:
+        sizes = [100]
+        labels = ['1日の目標枠']
+        colors = ['#e0e0e0']
     
     # 💡 【真・文字化け対策】ちゃんと「日本語」が入っている美しいフォントを直接適用する！
     import matplotlib.pyplot as plt
