@@ -33,6 +33,19 @@ MENU_FILE = "dinner_list.csv"
 
 def get_all_users():
     cols = ["user_id", "password", "target_weight", "last_update", "consecutive_days"]
+    
+    # 💡 パソコン（ローカル）の時はCSVから、Streamlit Cloudの時はネット上（secrets）から安全に読み込む
+    if "user_db" in st.secrets:
+        try:
+            # ネット上の秘密のURL（Googleスプレッドシート等）からデータを読み込む仕組み
+            df = pd.read_csv(st.secrets["user_db"])
+            for c in cols:
+                if c not in df.columns: df[c] = None
+            return df
+        except:
+            return pd.DataFrame(columns=cols)
+            
+    
     if os.path.exists(USER_FILE):
         try:
             df = pd.read_csv(USER_FILE)
@@ -57,7 +70,17 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     else:
         new_row = pd.DataFrame({"user_id": [user_id], "password": [password], "target_weight": [target_weight], "last_update": [datetime.now().strftime("%Y-%m-%d")], "consecutive_days": [consecutive_days or 1]})
         df = pd.concat([df, new_row], ignore_index=True)
+        
+    # パソコン用にも保存する（元のまま）
     df.to_csv(USER_FILE, index=False)
+    
+    # 💡 ここを追加！もしStreamlitの「金庫（Secrets）」にバックアップ用URLが設定されていたら、そこにもデータを送る
+    if "db_backup_url" in st.secrets:
+        try:
+            # ネット上のスプレッドシート（または外部API）へデータを同期する処理
+            pd.DataFrame(df).to_csv(st.secrets["db_backup_url"], index=False)
+        except:
+            pass
 
 def reset_basic_info_on_month_start(user_id):
     if datetime.now().day != 1:
