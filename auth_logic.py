@@ -35,9 +35,9 @@ def get_all_users():
     cols = ["user_id", "password", "target_weight", "last_update", "consecutive_days"]
     
     # 💡 パソコン（ローカル）の時はCSVから、Streamlit Cloudの時はネット上（secrets）から安全に読み込む
-    if "user_db" in st.secrets:
+    if "user_db" in st.secrets and st.secrets["user_db"]:
         try:
-            # ネット上の秘密のURL（Googleスプレッドシート等）からデータを読み込む仕組み
+            # 💡 405エラー対策：GitHubにある元のuser_settings.csvを正しく読み込む
             df = pd.read_csv(st.secrets["user_db"])
             for c in cols:
                 if c not in df.columns: df[c] = None
@@ -73,18 +73,16 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     # パソコン用にも保存する（元のまま）
     df.to_csv(USER_FILE, index=False)
     
-    # 💡 【ガチ修正】Google Apps ScriptのURLへエラーを出さずに100%データを流し込む処理
+    # 💡 Google Apps ScriptのURLへ【POST】で正しくデータを流し込む（405対策）
     if "db_backup_url" in st.secrets and st.secrets["db_backup_url"]:
         try:
             import requests
             import json
-            # JSONの文字データに変換
+            # データをきれいなJSONにして、確実に【POST】で送信する
             json_data = json.dumps(df.to_dict(orient="records"))
-            # Google側に「テキストデータだよ」と見せかけて安全に送りつける
             requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
         except:
             pass
-
 def reset_basic_info_on_month_start(user_id):
     if datetime.now().day != 1:
         return
