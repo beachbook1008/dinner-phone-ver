@@ -45,7 +45,6 @@ def get_all_users():
         except:
             return pd.DataFrame(columns=cols)
             
-    
     if os.path.exists(USER_FILE):
         try:
             df = pd.read_csv(USER_FILE)
@@ -74,11 +73,13 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     # パソコン用にも保存する（元のまま）
     df.to_csv(USER_FILE, index=False)
     
-    # 💡 ここを追加！もしStreamlitの「金庫（Secrets）」にバックアップ用URLが設定されていたら、そこにもデータを送る
-    if "db_backup_url" in st.secrets:
+    # 💡 【修正点】Googleスプレッドシート連携用の安全なバックアップ送信処理
+    if "db_backup_url" in st.secrets and st.secrets["db_backup_url"]:
         try:
-            # ネット上のスプレッドシート（または外部API）へデータを同期する処理
-            pd.DataFrame(df).to_csv(st.secrets["db_backup_url"], index=False)
+            # st.experimental_connection や外部Webhook等、安全に外部シートへデータを投げるリクエスト
+            import requests
+            # JSON形式でGoogleスプレッドシート等へバックアップを自動送信
+            requests.post(st.secrets["db_backup_url"], json=df.to_dict(orient="records"), timeout=5)
         except:
             pass
 
@@ -192,7 +193,7 @@ if not st.session_state['is_logged_in']:
     else:
         st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からあなたもライエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>美食家サンダーさんとの美食ダイエットの冒険へようこそ！</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>美食家サンダーさんとの美食ダイエット of 冒険へようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 l_id = st.text_input("ユーザーID", key="login_id", placeholder="IDを入力")
@@ -218,13 +219,11 @@ if not st.session_state['is_logged_in']:
                         
                         # 🍪 JavaScriptで安全にCookieに書き込む
                         st.components.v1.html(f"""
-    <script>
-        document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/; Secure; SameSite=Lax";
-    </script>
-""", height=0)
+                            <script>
+                                document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/; Secure; SameSite=Lax";
+                            </script>
+                        """, height=0)
                            
-                        
-                        
                         st.success(f"ログイン成功！おかえりなさい、{l_id}さん ")
                         time.sleep(0.5)
                         st.rerun()
@@ -295,7 +294,7 @@ with st.sidebar:
         # 🍪 JavaScriptを使って安全にCookieを消去
         st.components.v1.html("""
             <script>
-                document.cookie = "saved_user_id=; max-age=0; path=/;";
+                document.cookie = "saved_user_id=; max-age=0; path=/; Secure; SameSite=Lax";
             </script>
         """, height=0)
         st.session_state.clear()
@@ -335,7 +334,7 @@ st.divider()
 
 if ai_persona == "高木先生モード":
     current_avatar = takagi_avatar
-elif ai_persona == "サンダーさん (身内ノリ)":
+elif ai_persona == "サンダーさん ":
     current_avatar = thunder_avatar
 else:
     current_avatar = "🤖"
