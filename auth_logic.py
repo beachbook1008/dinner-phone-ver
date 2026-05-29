@@ -80,11 +80,8 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
             import requests
             import json
             
-            # 💡 【ガチ修正】新しく登録したデータでも絶対に NaN（空っぽデータ）が混ざらないように完全に綺麗にする！
-            clean_df = df.copy()
-            # 空っぽの場所（NaN）を全部『None』や適切な文字に変換してGoogleを怒らせないようにする
-            clean_df = clean_df.where(pd.notnull(clean_df), None)
-            
+            # 💡 【真・呪い解除】勝手にNaNに戻されるのを防ぐため、空っぽの場所はすべて「ただの空白文字」で強制的に塗りつぶす！
+            clean_df = df.fillna("")
             json_data = json.dumps(clean_df.to_dict(orient="records"))
             
             # Googleの最新URLへPOSTで送信
