@@ -3,7 +3,6 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 import os
-import time
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
 from datetime import datetime
 from dotenv import load_dotenv
@@ -37,7 +36,6 @@ def get_all_users():
     # 💡 パソコン（ローカル）の時はCSVから、Streamlit Cloudの時はネット上（secrets）から安全に読み込む
     if "user_db" in st.secrets and st.secrets["user_db"]:
         try:
-            # 💡 405エラー対策：GitHubにある元のuser_settings.csvを正しく読み込む
             df = pd.read_csv(st.secrets["user_db"])
             for c in cols:
                 if c not in df.columns: df[c] = None
@@ -70,19 +68,30 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         new_row = pd.DataFrame({"user_id": [user_id], "password": [password], "target_weight": [target_weight], "last_update": [datetime.now().strftime("%Y-%m-%d")], "consecutive_days": [consecutive_days or 1]})
         df = pd.concat([df, new_row], ignore_index=True)
         
-    # パソコン用にも保存する（元のまま）
     df.to_csv(USER_FILE, index=False)
     
-    # 💡 Google Apps ScriptのURLへ【POST】で正しくデータを流し込む（405対策）
-    if "db_backup_url" in st.secrets and st.secrets["db_backup_url"]:
+    # 🔍 【直接原因を見つけるための最強のチェック機能】
+    if "db_backup_url" not in st.secrets:
+        st.error("🚨 エラー理由：StreamlitのSecretsに『db_backup_url』という名前が登録されていません！")
+    elif not st.secrets["db_backup_url"]:
+        st.error("🚨 エラー理由：Secretsの『db_backup_url = \"\"』の中身が空っぽになっています！")
+    else:
         try:
             import requests
             import json
-            # データをきれいなJSONにして、確実に【POST】で送信する
             json_data = json.dumps(df.to_dict(orient="records"))
-            requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
-        except:
-            pass
+            
+            # Googleの最新URLへPOSTで送信
+            res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
+            
+            # Googleから返ってきた結果を画面に直接出す！
+            if res.status_code == 200:
+                st.success(f"⭕ Googleへの送信自体は成功しました！Googleからの返事: {res.text}")
+            else:
+                st.error(f"❌ Google側で拒否されました。エラーコード: {res.status_code} / 返事: {res.text}")
+        except Exception as e:
+            st.error(f"💥 通信エラーが起きました。エラー内容: {e}")
+
 def reset_basic_info_on_month_start(user_id):
     if datetime.now().day != 1:
         return
@@ -241,7 +250,7 @@ df_users = get_all_users()
 user_row = df_users[df_users['user_id'].astype(str) == user_id].iloc[0]
 df_menu = load_menu()
 
-# C. 目楽設定画面
+# C. 目標設定画面
 if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
     st.title(f"📅 目標設定 ({user_id})")
     t_w = st.number_input("今月の目標体重 (kg)", 30.0, 150.0, 52.0)
@@ -291,7 +300,6 @@ with st.sidebar:
     )
     
     if st.button("ログアウト"):
-        # 🍪 JavaScriptを使って安全にCookieを消去
         st.components.v1.html("""
             <script>
                 document.cookie = "saved_user_id=; max-age=0; path=/; Secure; SameSite=Lax";
