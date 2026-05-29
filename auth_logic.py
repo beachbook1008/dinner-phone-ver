@@ -399,7 +399,6 @@ with chart_col1:
         with c2:
             st.metric(label="☀️ 昼食", value=f"{int(lunch_cal)} kcal")
             st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
-
 with chart_col2:
     # 💡 グラフ用のデータを準備（残り枠がマイナスの時は0にする）
     left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
@@ -413,11 +412,45 @@ with chart_col2:
         sizes = [0, 0, 0, 100]
         labels = ['朝食', '昼食', '夕食', '目標枠']
     
-    # 💡 【超重要】サーバーに日本語フォントがなくても強制的に文字化けを直す裏技！
-    # 💡 【超重要】新バージョンでも絶対にエラーが出ない文字化け対策！
+    # 💡 【真・文字化け対策】ちゃんと「日本語」が入っている美しいフォントを直接適用する！
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
     import urllib.request
+    import os
+
+    # 1. 日本語対応のフォント（BIZ UDゴシック）をダウンロード
+    font_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
+    font_path = "BIZUDGothic-Regular.ttf"
+    if not os.path.exists(font_path):
+        try:
+            urllib.request.urlretrieve(font_url, font_path)
+        except:
+            pass
+            
+    # 2. フォントのデータを準備
+    if os.path.exists(font_path):
+        fp = fm.FontProperties(fname=font_path)
+    else:
+        fp = fm.FontProperties(family='sans-serif')
+    
+    # 3. グラフを描画（textpropsで直接日本語フォントを指定！）
+    fig, ax = plt.subplots(figsize=(4, 4))
+    wedges, texts, autotexts = ax.pie(
+        sizes, 
+        labels=labels, 
+        autopct=lambda p: '{:.1f}%'.format(p) if p > 0 else '', 
+        startangle=90, 
+        colors=colors,
+        # 💡 ここで日本語フォント(fp)を直接指定！絶対にエラーが出ない安全な書き方！
+        textprops={'color': "black", 'size': 9, 'fontproperties': fp}, 
+        wedgeprops=dict(width=0.4, edgecolor='white') # ドーナツの幅
+    )
+    # パーセントの数字部分にもフォントを適用
+    plt.setp(autotexts, size=8, weight="bold", fontproperties=fp)
+    ax.axis('equal')  
+    
+    # Streamlitの画面にグラフを表示！
+    st.pyplot(fig)
 
     # ネット上から無料の日本語フォント（Noto Sans）をその場でダウンロード
     font_url = "https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Regular.ttf"
