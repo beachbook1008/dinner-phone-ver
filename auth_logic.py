@@ -381,21 +381,59 @@ else:
 # --- 7.5 朝昼夕の合計摂取カロリー表示 ---
 breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum()
 lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum()
-total_cal = breakfast_cal + lunch_cal + st.session_state['selected_dinner_cal']
+dinner_selected_cal = st.session_state['selected_dinner_cal']
+total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 
 st.markdown("---")
-st.subheader("本日の栄養摂取状況")
-with st.container(border=True):
-    c1, c2 = st.columns(2)
-    c3, c4 = st.columns(2)
-    with c1:
-        st.metric(label=" 朝食", value=f"{int(breakfast_cal)} kcal")
-    with c2:
-        st.metric(label=" 昼食", value=f"{int(lunch_cal)} kcal")
-    with c3:
-        st.metric(label=" 夕食", value=f"{st.session_state['selected_dinner_cal']} kcal")
-    with c4:
-        st.metric(label=" 合計", value=f"{int(total_cal)} kcal")
+st.subheader("📊 本日の栄養摂取状況とバランス")
+
+# 💡 左右に分割して、左に数字、右に円グラフを並べる！
+chart_col1, chart_col2 = st.columns([1, 1])
+
+with chart_col1:
+    with st.container(border=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric(label="🌅 朝食", value=f"{int(breakfast_cal)} kcal")
+            st.metric(label="🌙 夕食", value=f"{int(dinner_selected_cal)} kcal")
+        with c2:
+            st.metric(label="☀️ 昼食", value=f"{int(lunch_cal)} kcal")
+            st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
+
+with chart_col2:
+    # 💡 グラフ用のデータを準備（残り枠がマイナスの時は0にする）
+    left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
+    
+    labels = ['朝食', '昼食', '夕食', '残り枠']
+    sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
+    colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
+    
+    # 全部0（何も入力されていない初期状態）の時はダミーで残り枠100%にする
+    if sum(sizes) == 0:
+        sizes = [0, 0, 0, 100]
+        labels = ['朝食', '昼食', '夕食', '目標枠']
+    
+    # 💡 綺麗な円グラフ（ドーナツ型）を描画する処理
+    import matplotlib.pyplot as plt
+    import matplotlib
+    # 日本語が文字化けしないように設定
+    matplotlib.rcParams['font.family'] = 'sans-serif'
+    
+    fig, ax = plt.subplots(figsize=(4, 4))
+    wedges, texts, autotexts = ax.pie(
+        sizes, 
+        labels=labels, 
+        autopct=lambda p: '{:.1f}%'.format(p) if p > 0 else '', 
+        startangle=90, 
+        colors=colors,
+        textprops=dict(color="black", size=9),
+        wedgeprops=dict(width=0.4, edgecolor='white') # ドーナツの幅
+    )
+    plt.setp(autotexts, size=8, weight="bold")
+    ax.axis('equal')  
+    
+    # Streamlitの画面にグラフを表示！
+    st.pyplot(fig)
 
 # --- 8. AI相談室 ---
 if ai_persona == "高木先生モード":
