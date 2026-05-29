@@ -203,7 +203,7 @@ if not st.session_state['is_logged_in']:
                         st.session_state['show_register'] = False
                         st.rerun()
     else:
-        st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からあなたもライエット</h1></div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からダイエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>先生との美食ダイエット of ようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
