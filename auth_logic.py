@@ -70,7 +70,7 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         
     df.to_csv(USER_FILE, index=False)
     
-    # 🔍 【直接原因を見つけるための最強のチェック機能】
+    # 🔍 【直接原因を見つけるためのチェック機能】
     if "db_backup_url" not in st.secrets:
         st.error("🚨 エラー理由：StreamlitのSecretsに『db_backup_url』という名前が登録されていません！")
     elif not st.secrets["db_backup_url"]:
@@ -80,7 +80,7 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
             import requests
             import json
             
-            # 💡 【真・呪い解除】勝手にNaNに戻されるのを防ぐため、空っぽの場所はすべて「ただの空白文字」で強制的に塗りつぶす！
+            
             clean_df = df.fillna("")
             json_data = json.dumps(clean_df.to_dict(orient="records"))
             
@@ -190,22 +190,22 @@ if not st.session_state['is_logged_in']:
                 st.markdown("")
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    if st.button("📝 登録", use_container_width=True):
+                    if st.button(" 登録", use_container_width=True):
                         if n_id and n_pw:
                             save_user(n_id, n_pw)
-                            st.success("登録完了！🥢 さあ、始めましょう！")
+                            st.success("登録完了！ さあ、始めましょう！")
                             st.session_state['show_register'] = False
                             st.rerun()
                         else:
                             st.error("IDとパスワードを入力してね！")
                 with col_b:
-                    if st.button("🔙 戻る", use_container_width=True):
+                    if st.button(" 戻る", use_container_width=True):
                         st.session_state['show_register'] = False
                         st.rerun()
     else:
         st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からあなたもライエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>美食家サンダーさんとの美食ダイエット of 冒険へようこそ！</p>", unsafe_allow_html=True)
+            st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>先生との美食ダイエット of ようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
                 l_id = st.text_input("ユーザーID", key="login_id", placeholder="IDを入力")
@@ -271,7 +271,7 @@ elif os.path.exists("mii_thunder.png"):
 else:
     thunder_avatar = "⚡️"
 
-st.title(f"🥘 推し活 で ライエット")
+st.title(f"今日からダイエット")
 
 consecutive_days = int(user_row.get('consecutive_days', 1))
 st.markdown("---")
@@ -283,8 +283,8 @@ with st.container(border=True):
 st.markdown("---")
 
 with st.sidebar:
-    st.image(thunder_avatar, width=150, caption="美食家サンダー⚡️")
-    st.header("👤 ステータス")
+    st.image(thunder_avatar, width=150, caption="みんなでがんばろう")
+    st.header(" ステータス")
     st.success(f"User: {user_id}\nTarget: {user_row['target_weight']}kg")
     
     weight = st.number_input("今の体重 (kg)", 30.0, 150.0, st.session_state['weight'])
@@ -300,7 +300,7 @@ with st.sidebar:
     st.header(" 発表用AI設定")
     ai_persona = st.selectbox(
         "AIのキャラクター",
-        ["サンダーさん ", "高木先生モード", "フォーマル "]
+        ["雷さん ", "高木先生モード", "フォーマル "]
     )
     
     if st.button("ログアウト"):
@@ -323,7 +323,7 @@ with col2:
     l_items = st.multiselect("昼食", df_menu['display'].tolist() if not df_menu.empty else [])
 
 if b_items or l_items:
-    st.subheader("🍽️ 選択されたメニュー")
+    st.subheader("選択されたメニュー")
     col1, col2 = st.columns(2)
     if b_items:
         with col1:
@@ -411,10 +411,10 @@ with st.container(border=True):
 # --- 8. AI相談室 ---
 if ai_persona == "高木先生モード":
     chat_placeholder = "高木先生にWeb3やライエットの相談をする"
-elif ai_persona == "フォーマル (教授ウケ重視)":
+elif ai_persona == "フォーマル":
     chat_placeholder = "AIアシスタントに論理的な相談をする"
 else:
-    chat_placeholder = "美食家サンダーさんに相談"
+    chat_placeholder = "雷さんに相談"
 
 if user_msg := st.chat_input(chat_placeholder):
     with st.chat_message("assistant", avatar=current_avatar):
