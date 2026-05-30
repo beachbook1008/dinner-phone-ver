@@ -330,54 +330,38 @@ dinner_cal = target_cal - (df_menu[df_menu['display'].isin(b_items)]['cal'].sum(
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
 # --- 6. 自動挨拶（アバター切り替え対応版） ---
+# --- 6. 自動挨拶（アバター切り替え対応版） ---
 st.divider()
 
-# 💡 【ご要望】キャラクターの選択状態に応じてアバターの画像パスを決定！
+# 💡 キャラクターの選択状態に応じてアバターと吹き出しの色を決定！
 if ai_persona == "高木先生モード":
     current_avatar = takagi_avatar
+    bubble_class = "chat-bubble takagi-bubble"
 elif ai_persona == "雷さん ":
-    current_avatar = rai_avatar  # 👈 ここでmii_thunder.jpgが適用されます！
+    current_avatar = rai_avatar
+    bubble_class = "chat-bubble rai-bubble"
 else:
     current_avatar = "🤖"
+    bubble_class = "chat-bubble"
 
 with st.chat_message("assistant", avatar=current_avatar):
     if ai_persona == "高木先生モード":
         if dinner_cal > 500:
-            st.write(f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！")
+            msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
         elif dinner_cal > 0:
-            st.write(f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！")
+            msg = f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！"
         else:
-            st.write(f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！")
+            msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
     else:
         if dinner_cal > 500:
-            st.write(f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！")
+            msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
         elif dinner_cal > 0:
-            st.write(f"今のところ順調。夜は控えめな美食を楽しんで！")
+            msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
         else:
-            st.write(f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！")
-
-# --- 7. おすすめメニュー表示 ---
-st.subheader(" おすすめメニュー")
-if not df_menu.empty:
-    recs = df_menu[df_menu['cal'] <= dinner_cal].sort_values(by='cal', ascending=False).head(5)
-    if not recs.empty:
-        cols = st.columns(5, gap="medium")
-        for i, (_, row) in enumerate(recs.iterrows()):
-            with cols[i]:
-                with st.container(border=True):
-                    st.markdown(f"<h3 style='text-align: center;'>🍽️</h3>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align: center; font-weight: bold; font-size: 16px;'>{row['store']}</p>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align: center; color: #666; font-size: 14px;'>{row['name']}</p>", unsafe_allow_html=True)
-                    st.markdown(f"<p style='text-align: center; color: #ff6b6b; font-size: 18px; font-weight: bold;'>✨ {int(row['cal'])} kcal</p>", unsafe_allow_html=True)
-                    if st.button("選択する", key=f"rec_{i}", use_container_width=True):
-                        st.session_state['selected_dinner'] = row['name']
-                        st.session_state['selected_dinner_cal'] = int(row['cal'])
-                        st.success(f"「{row['name']}」を夕食に選択しました！")
-    else:
-        st.warning("おすすめメニューが見つかりません。")
-else:
-    st.error("メニューが読み込めません。")
-
+            msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
+            
+    # 💡 st.write の代わりに吹き出し用のHTMLで文字を囲む！
+    st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 # --- 7.5 朝昼夕の合計摂取カロリー表示 ---
 breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum()
 lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum()
@@ -502,7 +486,18 @@ if user_msg := st.chat_input(chat_placeholder):
         with st.spinner(spinner_msg):
             try:
                 response = model.generate_content(prompt)
-                st.write(response.text)
+                
+                # キャラクターに応じた吹き出しクラスを再度判定
+                if ai_persona == "高木先生モード":
+                    bubble_class = "chat-bubble takagi-bubble"
+                elif ai_persona == "雷さん ":
+                    bubble_class = "chat-bubble rai-bubble"
+                else:
+                    bubble_class = "chat-bubble"
+                
+                # 💡 AIの返答を吹き出し風のHTMLでラッピングして表示
+                st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
+                
             except Exception as e:
                 st.error(f"AIエラー: {e}")
 

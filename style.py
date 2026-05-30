@@ -11,7 +11,30 @@ def apply_custom_css():
             font-size: 16px !important;
             line-height: 1.6 !important;
         }
+/* 💬 喋っている風の吹き出しスタイル */
+        .chat-bubble {
+            background-color: #f1f5f9 !important; /* 薄いグレー */
+            border-radius: 16px !important;
+            padding: 12px 16px !important;
+            margin-top: 5px !important;
+            display: inline-block !important;
+            max-width: 85% !important;
+            color: #222222 !important;
+            position: relative !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+        }
 
+        /* 高木先生モードの時は少しインテリジェンスな薄い青に */
+        .takagi-bubble {
+            background-color: #e0f2fe !important; /* 薄い青 */
+            border-left: 4px solid #0284c7 !important;
+        }
+
+        /* 雷さんの時は元気な薄い黄色に */
+        .rai-bubble {
+            background-color: #fef9c3 !important; /* 薄い黄 */
+            border-left: 4px solid #eab308 !important;
+        }
         /* サイドバー：シンプルで情報が見やすい */
         [data-testid="stSidebar"] {
             background-color: #f8f9fa !important;
