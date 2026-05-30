@@ -471,13 +471,29 @@ else:
     chat_placeholder = "雷さんに相談"
 
 if user_msg := st.chat_input(chat_placeholder):
-    # 💡 チャットを送信した際にも、選択されたキャラクター画像（mii_thunder.jpgなど）がアイコンになります！
     with st.chat_message("assistant", avatar=current_avatar):
+        # 1. 各種変数の状況を、AIがパッと理解できる構造化テキストにする
+        current_status = f"""
+[User Status Context]
+- Target Weight: {user_row['target_weight']} kg
+- Current Weight: {weight} kg
+- Activity Level Factor: {activity}
+- Remaining Calorie Budget for Dinner: {int(dinner_cal)} kcal
+- Total Calorie Intake Today: {int(total_cal)} kcal
+  * Breakfast: {int(breakfast_cal)} kcal (Selected: {', '.join(b_items) if b_items else 'None'})
+  * Lunch: {int(lunch_cal)} kcal (Selected: {', '.join(l_items) if l_items else 'None'})
+  * Dinner (Selected from recommendation): {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
+"""
+
+        # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
         sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
-        prompt = f"{sys_prompt}\n残り{int(dinner_cal)}kcal。質問:{user_msg}"
+        prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
+        
         try:
             response = model.generate_content(prompt)
             st.write(response.text)
+        except Exception as e:
+            st.error(f"AIエラー: {e}")
         except Exception as e:
             st.error(f"AIエラー: {e}")
 
