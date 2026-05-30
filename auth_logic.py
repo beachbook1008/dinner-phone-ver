@@ -486,16 +486,25 @@ if user_msg := st.chat_input(chat_placeholder):
 """
 
         # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
+        # # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
         sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
         prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
         
-        try:
-            response = model.generate_content(prompt)
-            st.write(response.text)
-        except Exception as e:
-            st.error(f"AIエラー: {e}")
-        except Exception as e:
-            st.error(f"AIエラー: {e}")
+        # 💡 キャラクターごとにスピナーのメッセージを切り替える設定
+        if ai_persona == "高木先生モード":
+            spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
+        elif ai_persona == "雷さん ":
+            spinner_msg = "雷さんが美味しいお店を爆速検索中"
+        else:
+            spinner_msg = "AIが論理的なアドバイスを生成しています... "
+
+        # 💡 try-except の外側を with st.spinner() で囲む
+        with st.spinner(spinner_msg):
+            try:
+                response = model.generate_content(prompt)
+                st.write(response.text)
+            except Exception as e:
+                st.error(f"AIエラー: {e}")
 
 # --- サイドバーの最下部にBGMを配置 ---
 with st.sidebar:
