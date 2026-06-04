@@ -448,33 +448,54 @@ with chart_col2:
     st.pyplot(fig)
 
 # --- 8. AI相談室 ---
+# --- 8. AI相談室 ---
 if ai_persona == "高木先生モード":
     chat_placeholder = "高木先生にWeb3やライエットの相談をする"
 elif ai_persona == "フォーマル":
     chat_placeholder = "AIアシスタントに論理的な相談をする"
 else:
     chat_placeholder = "雷さんに相談"
-# --- ここから追加 ---
+
 st.markdown("---")
-# 画像アップロード機能（任意）
-uploaded_file = st.file_uploader("📸 食べたものの画像をアップロード（任意）", type=["jpg", "jpeg", "png"])
 
+# 🌟 1. 画像アップロードとタイミング選択
+uploaded_file = st.file_uploader("📸 食べたもの（またはこれから食べる予定）の画像をアップロード", type=["jpg", "jpeg", "png"])
+
+meal_timing = ""
 if uploaded_file:
-    # アップロードされたら小さくプレビュー表示しておく
     st.image(uploaded_file, caption="送信準備完了", width=250)
-# 🌟 提案ボタンを設置
-suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！")
+    # 🌟 いつのご飯かを選択（横並びのラジオボタン）
+    meal_timing = st.radio(
+        "💡 これはいつのご飯ですか？", 
+        ["朝食（食べた）", "昼食（食べた）", "夜ご飯（これから食べる）"], 
+        horizontal=True
+    )
 
-# 🌟 チャット入力またはボタンのどちらから動かされたかを判定する仕組み
+# 🌟 2. 夜ご飯提案ボタン（CSV読み込み機能付き）
+suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
+
+# 🌟 3. メッセージの組み立て
 user_msg = None
-chat_input_val = st.chat_input("メッセージを入力...")
+chat_input_val = st.chat_input(chat_placeholder)
 
 if chat_input_val:
     user_msg = chat_input_val
-elif suggest_button:
-    user_msg = "今日の夜ご飯を提案して！dinner_list.csvも参考にして、おすすめのメニューとカロリー計算を教えて！"
+    # 画像があってタイミングも選ばれている場合、プロンプトの先頭に情報を付与する
+    if uploaded_file and meal_timing:
+        user_msg = f"【画像情報: {meal_timing}】\n" + user_msg
 
-# 🌟 メッセージ（またはボタンの自動テキスト）があればGeminiの処理を走らせる
+elif suggest_button:
+    # CSVファイルを読み込んでAIに渡すプログラミング
+    try:
+        df_menu_raw = pd.read_csv(MENU_FILE)
+        # Geminiが処理しやすいようにCSVの全テキストデータを変数に格納
+        menu_data = df_menu_raw.to_csv(index=False)
+        
+        user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
+    except Exception as e:
+        user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！（※dinner_list.csvが読み込めませんでした）"
+
+# 🌟 4. メッセージ（またはボタンの自動テキスト）があればGeminiの処理を走らせる
 if user_msg:
     with st.chat_message("assistant", avatar=current_avatar):
         # 1. 各種変数の状況を、AIがパッと理解できる構造化テキストにする
