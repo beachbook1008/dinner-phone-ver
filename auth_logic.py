@@ -7,6 +7,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
 import threading
+import re
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
@@ -72,9 +73,7 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
         
     df.to_csv(USER_FILE, index=False)
     
-    if "db_backup_url" not in st.secrets:
-        pass
-    elif not st.secrets["db_backup_url"]:
+    if "db_backup_url" not in st.secrets or not st.secrets["db_backup_url"]:
         pass
     else:
         def run_backup_async(url, data_str):
@@ -151,6 +150,7 @@ if 'selected_dinner' not in st.session_state: st.session_state['selected_dinner'
 if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
 if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
 if 'selected_dinner_cal' not in st.session_state: st.session_state['selected_dinner_cal'] = 0
+if 'last_analyzed_file' not in st.session_state: st.session_state['last_analyzed_file'] = None
 
 cookie_user_id = st.context.cookies.get("saved_user_id")
 
@@ -255,19 +255,7 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
         st.rerun()
     st.stop()
 
-# --- 4. メイン画面の準備 ---
-st.title(f"今日からダイエット")
-
-consecutive_days = int(user_row.get('consecutive_days', 1))
-st.markdown("---")
-with st.container(border=True):
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        st.markdown(f"<div style='text-align: center;'><h2 style='color: #ff6b6b; margin-bottom: 5px;'>🔥 連続ログイン</h2><p style='font-size: 16px; color: #666; margin: 5px 0;'>あなたは今日で</p><p style='font-size: 48px; font-weight: bold; color: #ff6b6b; margin: 10px 0;'>{consecutive_days}</p><p style='font-size: 16px; color: #666; margin-top: 5px;'>日連続で頑張ってるよ！</p></div>", unsafe_allow_html=True)
-
-st.markdown("---")
-
-# --- サイドバーの設定 ---
+# --- サイドバーの設定（計算の前に配置して値を即時反映） ---
 with st.sidebar:
     if takagirai_img:
         st.image(takagirai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
@@ -288,10 +276,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.header(" 発表用AI設定")
-    ai_persona = st.selectbox(
-        "AIのキャラクター",
-        ["雷さん ", "高木先生モード", "フォーマル "]
-    )
+    ai_persona = st.selectbox("AIのキャラクター", ["雷さん ", "高木先生モード", "フォーマル "])
     
     if st.button("ログアウト"):
         st.components.v1.html("""
@@ -302,15 +287,116 @@ with st.sidebar:
         st.session_state.clear()
         st.rerun()
 
-# --- 5. 計算ロジック ---
+# タイトル表示と連続ログイン表示
+st.title(f"今日からダイエット")
+consecutive_days = int(user_row.get('consecutive_days', 1))
+st.markdown("---")
+with st.container(border=True):
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        st.markdown(f"<div style='text-align: center;'><h2 style='color: #ff6b6b; margin-bottom: 5px;'>🔥 連続ログイン</h2><p style='font-size: 16px; color: #666; margin: 5px 0;'>あなたは今日で</p><p style='font-size: 48px; font-weight: bold; color: #ff6b6b; margin: 10px 0;'>{consecutive_days}</p><p style='font-size: 16px; color: #666; margin-top: 5px;'>日連続で頑張ってるよ！</p></div>", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# --- 4. メッセージ・画像・提案入力 UI配置 ---
+if ai_persona == "高木先生モード":
+    chat_placeholder = "高木先生にWeb3やライエットの相談をする"
+elif ai_persona == "フォーマル":
+    chat_placeholder = "AIアシスタントに論理的な相談をする"
+else:
+    chat_placeholder = "雷さんに相談"
+
+uploaded_file = st.file_uploader("📸 食べたもの（またはこれから食べる予定）の画像をアップロード", type=["jpg", "jpeg", "png"])
+
+meal_timing = ""
+if uploaded_file:
+    st.image(uploaded_file, caption="送信準備完了", width=250)
+    meal_timing = st.radio("💡 これはいつのご飯ですか？", ["朝食（食べた）", "昼食（食べた）", "夜ご飯（これから食べる）"], horizontal=True)
+
+suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
+chat_input_val = st.chat_input(chat_placeholder)
+
+user_msg = None
+is_vision_mode = False
+
+if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
+    is_vision_mode = True
+    if "夜ご飯" in meal_timing:
+        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
+    else:
+        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
+    st.session_state['last_analyzed_file'] = uploaded_file.name
+
+elif chat_input_val:
+    user_msg = chat_input_val
+
+elif suggest_button:
+    try:
+        df_menu_raw = pd.read_csv(MENU_FILE)
+        menu_data = df_menu_raw.to_csv(index=False)
+        user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
+    except Exception as e:
+        user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
+
+# --- 5. AI相談のリアルタイム処理（表示・計算の前に1発で完結させる） ---
+ai_printed_text = ""
+if user_msg:
+    # 暫定カロリー計算（最新のステータスをAIに伝えるため）
+    tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
+    tmp_target = (tmp_bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
+    tmp_csv_b = df_menu[df_menu['display'].isin(st.session_state.get('b_items_sel', []))]['cal'].sum() if not df_menu.empty else 0
+    tmp_csv_l = df_menu[df_menu['display'].isin(st.session_state.get('l_items_sel', []))]['cal'].sum() if not df_menu.empty else 0
+    
+    current_status = f"""
+[User Status Context]
+- Target Weight: {user_row['target_weight']} kg
+- Current Weight: {weight} kg
+- Activity Level Factor: {activity}
+- Remaining Calorie Budget for Dinner: {int(tmp_target - (tmp_csv_b + st.session_state['vision_breakfast_cal']) - (tmp_csv_l + st.session_state['vision_lunch_cal']))} kcal
+"""
+    sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
+    if is_vision_mode:
+        sys_prompt += f"\n\n【システムからの絶対命令】\n1. 回答の中で、必ず「画像を見たこと」と「ユーザーがすでに{meal_timing}を食べた（または食べる）事実」に明確に触れてください。\n2. 料理の推定カロリーを計算し、回答の「一番最後の行」に必ず半角数字で「【CALORIE:数字】」というタグを出力してください（例：【CALORIE:750】）。\n3. 文面は必ず現在のキャラクター（{ai_persona.strip()}）になりきって作成してください。"
+
+    prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
+    spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡" if ai_persona == "雷さん " else "AIプロンプトを送信中... 🌐"
+
+    with st.spinner(spinner_msg):
+        try:
+            if is_vision_mode and uploaded_file is not None:
+                img = Image.open(uploaded_file)
+                response = model.generate_content([prompt, img])
+            else:
+                response = model.generate_content(prompt)
+            
+            ai_printed_text = response.text
+            extracted_cal = 0
+            
+            match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_printed_text)
+            if match:
+                extracted_cal = int(match.group(1))
+                ai_printed_text = re.sub(r'【CALORIE:\s*\d+\s*】', '', ai_printed_text).strip()
+            
+            if extracted_cal > 0 and meal_timing:
+                if "朝食" in meal_timing:
+                    st.session_state['vision_breakfast_cal'] = extracted_cal
+                elif "昼食" in meal_timing:
+                    st.session_state['vision_lunch_cal'] = extracted_cal
+                elif "夜ご飯" in meal_timing:
+                    st.session_state['selected_dinner_cal'] = extracted_cal
+                    
+        except Exception as e:
+            st.error(f"AIエラー: {e}")
+
+# --- 6. カロリーの確定計算とメニュー選択 ---
 bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
 target_cal = (bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
 
 col1, col2 = st.columns(2)
 with col1:
-    b_items = st.multiselect("朝食", df_menu['display'].tolist() if not df_menu.empty else [])
+    b_items = st.multiselect("朝食", df_menu['display'].tolist() if not df_menu.empty else [], key="b_items_sel")
 with col2:
-    l_items = st.multiselect("昼食", df_menu['display'].tolist() if not df_menu.empty else [])
+    l_items = st.multiselect("昼食", df_menu['display'].tolist() if not df_menu.empty else [], key="l_items_sel")
 
 if b_items or l_items:
     st.subheader("選択されたメニュー")
@@ -328,7 +414,6 @@ if b_items or l_items:
                 for item in l_items:
                     st.markdown(f"<p style='text-align: center; color: #666; font-size: 14px; font-weight: bold;'>✓ {item}</p>", unsafe_allow_html=True)
 
-# 🌟 カロリー統合計算
 csv_breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum() if not df_menu.empty else 0
 csv_lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum() if not df_menu.empty else 0
 
@@ -341,7 +426,7 @@ dinner_cal = target_cal - breakfast_cal - lunch_cal
 
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
-# --- 6. 自動挨拶 ---
+# --- 7. 自動挨拶 & AI相談室のチャット表示 ---
 st.divider()
 
 if ai_persona == "高木先生モード":
@@ -354,28 +439,29 @@ else:
     current_avatar = "🤖"
     bubble_class = "chat-bubble"
 
+# AI相談の返答がある場合はそちらを優先表示、ない場合は通常の挨拶を表示
 with st.chat_message("assistant", avatar=current_avatar):
-    if ai_persona == "高木先生モード":
+    if ai_printed_text:
+        st.markdown(f'<div class="{bubble_class}">{ai_printed_text}</div>', unsafe_allow_html=True)
+    else:
         if dinner_cal > 500:
             msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
         elif dinner_cal > 0:
             msg = f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！"
         else:
             msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
-    else:
-        if dinner_cal > 500:
-            msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
-        elif dinner_cal > 0:
-            msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
-        else:
-            msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
-            
-    st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
+        if ai_persona != "高木先生モード":
+            if dinner_cal > 500:
+                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
+            elif dinner_cal > 0:
+                msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
+            else:
+                msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
+        st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 
-# --- 7. 朝昼夕の合計摂取カロリー表示 ---
+# --- 8. 栄養摂取状況グラフの表示 ---
 st.markdown("---")
 st.subheader("📊 本日の栄養摂取状況とバランス")
-
 chart_col1, chart_col2 = st.columns([1, 1])
 
 with chart_col1:
@@ -390,14 +476,11 @@ with chart_col1:
 
 with chart_col2:
     left_cal = max(0, int(dinner_cal))
-    
     raw_labels = ['朝食', '昼食', '夕食', '残り枠']
     raw_sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
     raw_colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
     
-    labels = []
-    sizes = []
-    colors = []
+    labels, sizes, colors = [], [], []
     for s, l, c in zip(raw_sizes, raw_labels, raw_colors):
         if s > 0:
             labels.append(l)
@@ -405,155 +488,26 @@ with chart_col2:
             colors.append(c)
             
     if len(sizes) == 0:
-        sizes = [100]
-        labels = ['1日の目標枠']
-        colors = ['#e0e0e0']
+        sizes, labels, colors = [100], ['1日の目標枠'], ['#e0e0e0']
     
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
     
     font_path = download_font_cached()
-    if os.path.exists(font_path):
-        fp = fm.FontProperties(fname=font_path)
-    else:
-        fp = fm.FontProperties(family='sans-serif')
+    fp = fm.FontProperties(fname=font_path) if os.path.exists(font_path) else fm.FontProperties(family='sans-serif')
     
     fig, ax = plt.subplots(figsize=(4, 4))
     wedges, texts, autotexts = ax.pie(
-        sizes, 
-        labels=labels, 
-        autopct=lambda p: '{:.1f}%'.format(p) if p > 0 else '', 
-        startangle=90, 
-        colors=colors,
+        sizes, labels=labels, autopct=lambda p: '{:.1f}%'.format(p) if p > 0 else '',
+        startangle=90, colors=colors,
         textprops={'color': "black", 'size': 9, 'fontproperties': fp}, 
         wedgeprops=dict(width=0.4, edgecolor='white')
     )
     plt.setp(autotexts, size=8, weight="bold", fontproperties=fp)
     ax.axis('equal')  
-    
     st.pyplot(fig)
-
-# --- 8. AI相談室 ---
-if ai_persona == "高木先生モード":
-    chat_placeholder = "高木先生にWeb3やライエットの相談をする"
-elif ai_persona == "フォーマル":
-    chat_placeholder = "AIアシスタントに論理的な相談をする"
-else:
-    chat_placeholder = "雷さんに相談"
-
-st.markdown("---")
-
-uploaded_file = st.file_uploader("📸 食べたもの（またはこれから食べる予定）の画像をアップロード", type=["jpg", "jpeg", "png"])
-
-meal_timing = ""
-if uploaded_file:
-    st.image(uploaded_file, caption="送信準備完了", width=250)
-    meal_timing = st.radio(
-        "💡 これはいつのご飯ですか？", 
-        ["朝食（食べた）", "昼食（食べた）", "夜ご飯（これから食べる）"], 
-        horizontal=True
-    )
-
-suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
-
-if 'last_analyzed_file' not in st.session_state:
-    st.session_state['last_analyzed_file'] = None
-
-user_msg = None
-chat_input_val = st.chat_input(chat_placeholder)
-
-is_vision_mode = False
-if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
-    is_vision_mode = True
-    if "夜ご飯" in meal_timing:
-        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
-    else:
-        # 🌟 雷さん等に「画像認識した事」と「昼食を食べた事実」を絶対にガン無視させないシステム命令
-        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
-    st.session_state['last_analyzed_file'] = uploaded_file.name
-
-elif chat_input_val:
-    user_msg = chat_input_val
-
-elif suggest_button:
-    try:
-        df_menu_raw = pd.read_csv(MENU_FILE)
-        menu_data = df_menu_raw.to_csv(index=False)
-        user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
-    except Exception as e:
-        user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
-
-if user_msg:
-    current_status = f"""
-[User Status Context]
-- Target Weight: {user_row['target_weight']} kg
-- Current Weight: {weight} kg
-- Activity Level Factor: {activity}
-- Remaining Calorie Budget for Dinner: {int(dinner_cal)} kcal
-- Total Calorie Intake Today: {int(total_cal)} kcal
-  * Breakfast: {int(breakfast_cal)} kcal
-  * Lunch: {int(lunch_cal)} kcal
-  * Dinner: {int(dinner_selected_cal)} kcal
-"""
-    sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
-    
-    # 🌟 初回画像解析時のみ、キャラクター指示のブレを潰して、正確な出力用タグを命令
-    if is_vision_mode:
-        sys_prompt += f"\n\n【システムからの絶対命令】\n1. 回答の中で、必ず「画像を見たこと」と「ユーザーがすでに{meal_timing}を食べた（または食べる）事実」に明確に触れてください。\n2. 料理の推定カロリーを計算し、回答の「一番最後の行」に必ず半角数字で「【CALORIE:数字】」というタグを出力してください（例：【CALORIE:750】）。\n3. 文面は必ず現在のキャラクター（{ai_persona.strip()}）になりきって作成してください。"
-
-    prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
-    
-    if ai_persona == "高木先生モード":
-        spinner_msg = "AIプロンプトをメタバースに送信中... 🌐"
-    elif ai_persona == "雷さん ":
-        spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡"
-    else:
-        spinner_msg = "AIがアドバイスを生成中..."
-
-    with st.spinner(spinner_msg):
-        try:
-            if is_vision_mode and uploaded_file is not None:
-                img = Image.open(uploaded_file)
-                response = model.generate_content([prompt, img])
-            else:
-                response = model.generate_content(prompt)
-            
-            ai_response_text = response.text
-            extracted_cal = 0
-            
-            # 🌟 正規表現でどんなブレがあっても確実に【CALORIE:数字】を取得
-            import re
-            match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_response_text)
-            if match:
-                extracted_cal = int(match.group(1))
-                ai_response_text = re.sub(r'【CALORIE:\s*\d+\s*】', '', ai_response_text).strip()
-            
-            # 🌟 取得したカロリーをセッションに正しいタイミングで振り分けて保存（バグを完全解消！）
-            if extracted_cal > 0 and meal_timing:
-                if "朝食" in meal_timing:
-                    st.session_state['vision_breakfast_cal'] = extracted_cal
-                elif "昼食" in meal_timing:
-                    st.session_state['vision_lunch_cal'] = extracted_cal
-                elif "夜ご飯" in meal_timing:
-                    st.session_state['selected_dinner_cal'] = extracted_cal
-            
-            with st.chat_message("assistant", avatar=current_avatar):
-                if ai_persona == "高木先生モード":
-                    bubble_class = "chat-bubble takagi-bubble"
-                elif ai_persona == "雷さん ":
-                    bubble_class = "chat-bubble rai-bubble"
-                else:
-                    bubble_class = "chat-bubble"
-                
-                st.markdown(f'<div class="{bubble_class}">{ai_response_text}</div>', unsafe_allow_html=True)
-            
-            if extracted_cal > 0:
-                st.rerun()
-            
-        except Exception as e:
-            st.error(f"AIエラー: {e}")
 
 with st.sidebar:
     st.markdown("---")
     st.write("🎵 BGM")
-    st.video("https://youtu.be/l7Tr8xb_tFk", format="video/mp4", start_time=0)
+    st.video("https://youtu.be/l7Tr8helper", format="video/mp4", start_time=0)
