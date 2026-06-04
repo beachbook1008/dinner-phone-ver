@@ -321,29 +321,33 @@ chat_input_val = st.chat_input(chat_placeholder)
 user_msg = None
 is_vision_mode = False
 
-# 🌟 【超重要バグ修正】ファイル自体の中身からMD5ハッシュを作成し、確実・強固に画像認識を検知するブレーキ
+# 🌟 【バグ修正】uploaded_file が「本当にある時だけ」ハッシュを読み込むように完全ガード！
 if uploaded_file and meal_timing:
-    file_bytes = uploaded_file.getvalue()
-    current_file_hash = hashlib.md5(file_bytes).hexdigest() + f"_{meal_timing}"
-    
-    if st.session_state['last_analyzed_hash'] != current_file_hash:
-        is_vision_mode = True
-        if "夜ご飯" in meal_timing:
-            user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
-        else:
-            user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
-        st.session_state['last_analyzed_hash'] = current_file_hash
-
-elif chat_input_val:
-    user_msg = chat_input_val
-
-elif suggest_button:
     try:
-        df_menu_raw = pd.read_csv(MENU_FILE)
-        menu_data = df_menu_raw.to_csv(index=False)
-        user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
-    except Exception as e:
-        user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
+        file_bytes = uploaded_file.getvalue()
+        current_file_hash = hashlib.md5(file_bytes).hexdigest() + f"_{meal_timing}"
+        
+        if st.session_state['last_analyzed_hash'] != current_file_hash:
+            is_vision_mode = True
+            if "夜ご飯" in meal_timing:
+                user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
+            else:
+                user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
+            st.session_state['last_analyzed_hash'] = current_file_hash
+    except:
+        pass
+
+# 画像がない、または解析済みなら通常のテキスト入力やボタン判定へ安全に流す
+if not user_msg:
+    if chat_input_val:
+        user_msg = chat_input_val
+    elif suggest_button:
+        try:
+            df_menu_raw = pd.csv(MENU_FILE) if os.path.exists(MENU_FILE) else pd.DataFrame()
+            menu_data = df_menu_raw.to_csv(index=False)
+            user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
+        except Exception as e:
+            user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
 # --- 5. AI相談のリアルタイム処理 ---
 ai_printed_text = ""
