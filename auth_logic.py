@@ -19,9 +19,11 @@ takagirai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
-    # 🌟 404エラーの原因だった「transport="rest"」を削除し、最も安定して1日1500回使えるモデルに修正
+    # 🌟 404の原因だったtransport="rest"を完全削除！
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # 🌟 彩音さん提案の2段構成モデルを準備
+    model_vision = genai.GenerativeModel('gemini-2.5-flash')       # 画像認識用（超高精度）
+    model_chat = genai.GenerativeModel('gemini-2.5-flash-lite')   # 雑談・提案用（超軽量・低コスト）
 else:
     st.error("APIキーがないよ！")
     st.stop()
@@ -363,12 +365,13 @@ if user_msg:
 
     with st.spinner(spinner_msg):
         try:
+            # 🌟 ここで彩音さん設計の2段構成モデルの振り分けを発動！
             if is_vision_mode and uploaded_file is not None:
                 img = Image.open(uploaded_file)
-                response = model.generate_content([prompt, img])
+                response = model_vision.generate_content([prompt, img])  # 画像認識は高性能な通常Flash
             else:
-                response = model.generate_content(prompt)
-            
+                response = model_chat.generate_content(prompt)            # 雑談・提案は超軽量なFlash-Lite
+
             ai_printed_text = response.text
             extracted_cal = 0
             
@@ -443,6 +446,7 @@ with st.chat_message("assistant", avatar=current_avatar):
     if ai_printed_text:
         st.markdown(f'<div class="{bubble_class}">{ai_printed_text}</div>', unsafe_allow_html=True)
     else:
+        # 通常の挨拶時はAPIを叩かずに節約
         if dinner_cal > 500:
             msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
         elif dinner_cal > 0:
@@ -451,7 +455,7 @@ with st.chat_message("assistant", avatar=current_avatar):
             msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
         if ai_persona != "高木先生モード":
             if dinner_cal > 500:
-                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
+                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
             elif dinner_cal > 0:
                 msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
             else:
