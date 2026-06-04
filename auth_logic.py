@@ -604,4 +604,4 @@ with st.sidebar:
     st.markdown("---")
     st.write("🎵 BGM")
     # 🌟 完全プレーン化された動画URL
-    st.video("[https://youtu.be/l7Tr8xb_tFk](https://youtu.be/l7Tr8xb_tFk)", format="video/mp4", start_time=0)
+    st.video("https://youtu.be/l7Tr8xb_tFk")
