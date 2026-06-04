@@ -496,7 +496,12 @@ chat_input_val = st.chat_input(chat_placeholder)
 
 # A. 新しい画像がアップロードされ、まだ解析していない場合の自動処理
 if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
-    user_msg = f"【画像解析リクエスト: {meal_timing}】この画像に写っている料理の特定と、カロリー推定をお願いします。"
+    # 🌟 選ばれたボタンによって、AIへの命令を細かく切り替える
+    if "夜ご飯" in meal_timing:
+        user_msg = f"【画像解析リクエスト: {meal_timing}】これからこの料理を夜ご飯に食べようと思っています。画像から料理名の特定と推定カロリーを計算した上で、今日の残り枠に合うかどうかのアドバイスや、おすすめの食べ方を提案してください。"
+    else:
+        user_msg = f"【画像解析リクエスト: {meal_timing}】私はこの料理をすでに食べました。新しいメニューの提案は一切不要ですので、この画像に写っている料理の名前の特定と、その推定カロリーの計算だけを行ってください。"
+        
     st.session_state['last_analyzed_file'] = uploaded_file.name # 解析済みに記録
 
 # B. 通常のチャット入力があった場合
