@@ -20,7 +20,7 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
-    model = genai.GenerativeModel('models/gemini-3-flash-preview')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     st.error("APIキーがないよ！")
     st.stop()
