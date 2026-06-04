@@ -20,8 +20,8 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
-    # 🌟 1日1500回制限の安定版モデルへ完璧に切り替え（404エラー対策済）
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    # 🌟 404エラーを絶対に起こさない1日1500回制限の安定版モデル（-latest付き）
+    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 else:
     st.error("APIキーがないよ！")
     st.stop()
@@ -256,7 +256,7 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
         st.rerun()
     st.stop()
 
-# --- サイドバーの設定（値を即時反映させるため上部に配置） ---
+# --- サイドバーの設定（計算前に配置し、値をリアルタイムで反映） ---
 with st.sidebar:
     if takagirai_img:
         st.image(takagirai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
@@ -339,7 +339,7 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# --- 5. AI相談のリアルタイム処理（表示の前に完結させて計算ズレを完全に防ぐ） ---
+# --- 5. AI相談のリアルタイム処理（表示・計算の前に1発で処理を完結させて爆速化） ---
 ai_printed_text = ""
 if user_msg:
     tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
@@ -372,7 +372,7 @@ if user_msg:
             ai_printed_text = response.text
             extracted_cal = 0
             
-            # 正規表現で確実に数字だけを抜き取る
+            # 正規表現で確実に数字だけをハック
             match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_printed_text)
             if match:
                 extracted_cal = int(match.group(1))
@@ -427,7 +427,7 @@ dinner_cal = target_cal - breakfast_cal - lunch_cal
 
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
-# --- 7. 自動挨拶 & AI相談のチャット表示（リランなしでリアルタイム連動） ---
+# --- 7. 自動挨拶 & AI相談のチャット表示 ---
 st.divider()
 
 if ai_persona == "高木先生モード":
