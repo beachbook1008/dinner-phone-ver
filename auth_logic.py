@@ -6,14 +6,13 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from PIL import Image
+import threading
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
-# 💡 雷さんの単体画像
 rai_avatar = "mii_thunder.jpg" if os.path.exists("mii_thunder.jpg") else "⚡️"
-# 💡 集合写真とツーショット画像
 all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
-takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
+takagirai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
 # --- 1. 初期設定 ---
 load_dotenv()
@@ -74,30 +73,28 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     df.to_csv(USER_FILE, index=False)
     
     if "db_backup_url" not in st.secrets:
-        st.error("🚨 エラー理由：StreamlitのSecretsに『db_backup_url』という名前が登録されていません！")
+        pass
     elif not st.secrets["db_backup_url"]:
-        st.error("🚨 エラー理由：Secretsの『db_backup_url = \"\"』の中身が空っぽになっています！")
+        pass
     else:
-        try:
-            import requests
-            import json
-            clean_df = df.fillna("")
-            json_data = json.dumps(clean_df.to_dict(orient="records"))
-            res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
-            if res.status_code == 200:
-                st.success(f"⭕ Googleへの送信自体は成功しました！Googleからの返事: {res.text}")
-            else:
-                st.error(f"❌ Google側で拒否されました。エラーコード: {res.status_code} / 返事: {res.text}")
-        except Exception as e:
-            st.error(f"💥 通信エラーが起きました。エラー内容: {e}")
+        # 🌟 バックアップ通信を裏側で非同期に走らせ、画面を一切待たせない仕掛け（爆速化）
+        def run_backup_async(url, data_str):
+            try:
+                import requests
+                requests.post(url, data=data_str, headers={"Content-Type": "application/json"}, timeout=10)
+            except:
+                pass
+
+        import json
+        clean_df = df.fillna("")
+        json_data = json.dumps(clean_df.to_dict(orient="records"))
+        threading.Thread(target=run_backup_async, args=(st.secrets["db_backup_url"], json_data), daemon=True).start()
 
 def reset_basic_info_on_month_start(user_id):
-    if datetime.now().day != 1:
-        return
+    if datetime.now().day != 1: return
     df = get_all_users()
     u_str = str(user_id)
-    if u_str not in df['user_id'].astype(str).values:
-        return
+    if u_str not in df['user_id'].astype(str).values: return
     idx = df[df['user_id'].astype(str) == u_str].index[0]
     df.at[idx, 'target_weight'] = pd.NA
     df.at[idx, 'last_update'] = datetime.now().strftime("%Y-%m-%d")
@@ -106,13 +103,11 @@ def reset_basic_info_on_month_start(user_id):
 def calculate_consecutive_days(user_id):
     df = get_all_users()
     u_str = str(user_id)
-    if u_str not in df['user_id'].astype(str).values:
-        return 1
+    if u_str not in df['user_id'].astype(str).values: return 1
     idx = df[df['user_id'].astype(str) == u_str].index[0]
     last_update_str = df.at[idx, 'last_update']
     current_consecutive = df.at[idx, 'consecutive_days']
-    if pd.isna(last_update_str) or pd.isna(current_consecutive):
-        return 1
+    if pd.isna(last_update_str) or pd.isna(current_consecutive): return 1
     try:
         last_update = datetime.strptime(last_update_str, "%Y-%m-%d").date()
         today = datetime.now().date()
@@ -136,15 +131,28 @@ def load_menu():
     except:
         return pd.DataFrame()
 
+# 🌟 毎回ダウンロードが走るのを防ぐため、キャッシュ関数化して爆速化！
+@st.cache_resource
+def download_font_cached():
+    f_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
+    f_path = "BIZUDGothic-Regular.ttf"
+    if not os.path.exists(f_path):
+        try:
+            import urllib.request
+            urllib.request.urlretrieve(f_url, f_path)
+        except:
+            pass
+    return f_path
+
 # --- 3. 画面制御ロジック ---
-if 'is_logged_in' not in st.session_state:
-    st.session_state['is_logged_in'] = False
-if 'show_register' not in st.session_state:
-    st.session_state['show_register'] = False
-if 'selected_dinner' not in st.session_state:
-    st.session_state['selected_dinner'] = None
-if 'selected_dinner_cal' not in st.session_state:
-    st.session_state['selected_dinner_cal'] = 0
+if 'is_logged_in' not in st.session_state: st.session_state['is_logged_in'] = False
+if 'show_register' not in st.session_state: st.session_state['show_register'] = False
+if 'selected_dinner' not in st.session_state: st.session_state['selected_dinner'] = None
+
+# 🌟 画像認識したカロリーを保存する場所（セッション状態）を初期化
+if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
+if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
+if 'selected_dinner_cal' not in st.session_state: st.session_state['selected_dinner_cal'] = 0
 
 cookie_user_id = st.context.cookies.get("saved_user_id")
 
@@ -169,7 +177,6 @@ if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
         st.markdown("<div style='text-align: center;'><h1 style='color: #ff6b6b;'>📝 新規会員登録</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            # 💡 新規登録画面の上部にも華やかに集合写真を配置
             if all_friends_img:
                 st.image(all_friends_img, use_container_width=True, caption="E班メンバー一同でサポートします！")
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>新しくアカウントを作成して一緒にダイエットを始めましょう！</p>", unsafe_allow_html=True)
@@ -195,10 +202,8 @@ if not st.session_state['is_logged_in']:
     else:
         st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からダイエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            # 💡 【ご要望】ログイン画面のトップにみんなの写真（allfriends.jpg）を表示！
             if all_friends_img:
                 st.image(all_friends_img, use_container_width=True, caption="デジタル変革実験 E班プロジェクト")
-                
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>先生・メンバーとの美食ダイエットへようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
@@ -225,7 +230,6 @@ if not st.session_state['is_logged_in']:
                                 document.cookie = "saved_user_id={l_id}; max-age=2592000; path=/; Secure; SameSite=Lax";
                             </script>
                         """, height=0)
-                           
                         st.success(f"ログイン成功！おかえりなさい、{l_id}さん ")
                         time.sleep(0.5)
                         st.rerun()
@@ -267,9 +271,8 @@ st.markdown("---")
 
 # --- サイドバーの設定 ---
 with st.sidebar:
-    # 💡 【ご要望】高木先生と雷さんのツーショット画像をサイドバー上部にマスコットとして組み込み！
-    if takagi_rai_img:
-        st.image(takagi_rai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
+    if takagirai_img:
+        st.image(takagirai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
     else:
         st.markdown("👥 **チーム高木＆雷**")
         
@@ -327,28 +330,22 @@ if b_items or l_items:
                 for item in l_items:
                     st.markdown(f"<p style='text-align: center; color: #666; font-size: 14px; font-weight: bold;'>✓ {item}</p>", unsafe_allow_html=True)
 
-# 🌟 画像認識したカロリーを保存する場所（セッション状態）を初期化
-if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
-if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
-if 'vision_dinner_cal' not in st.session_state: st.session_state['vision_dinner_cal'] = 0
-
-# CSVから選んだカロリーの合計
+# 🌟 カロリー統合計算（バグを完全修正し、朝・昼・夕の数字がズレないように統合）
 csv_breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum() if not df_menu.empty else 0
 csv_lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum() if not df_menu.empty else 0
 
-# 🌟 CSVのカロリー ＋ 画像認識したカロリー をそれぞれのタイミングで合計する
 breakfast_cal = csv_breakfast_cal + st.session_state['vision_breakfast_cal']
 lunch_cal = csv_lunch_cal + st.session_state['vision_lunch_cal']
+dinner_selected_cal = st.session_state['selected_dinner_cal']
 
-# 残り枠の計算（夜ご飯に選んだ分も引く場合は足してください）
+total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 dinner_cal = target_cal - breakfast_cal - lunch_cal
+
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
-# --- 6. 自動挨拶（アバター切り替え対応版） ---
-# --- 6. 自動挨拶（アバター切り替え対応版） ---
+# --- 6. 自動挨拶 ---
 st.divider()
 
-# 💡 キャラクターの選択状態に応じてアバターと吹き出しの色を決定！
 if ai_persona == "高木先生モード":
     current_avatar = takagi_avatar
     bubble_class = "chat-bubble takagi-bubble"
@@ -375,18 +372,12 @@ with st.chat_message("assistant", avatar=current_avatar):
         else:
             msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
             
-    # 💡 st.write の代わりに吹き出し用のHTMLで文字を囲む！
     st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
-# --- 7.5 朝昼夕の合計摂取カロリー表示 ---
-breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum()
-lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum()
-dinner_selected_cal = st.session_state['selected_dinner_cal']
-total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 
+# --- 7. 朝昼夕の合計摂取カロリー表示 ---
 st.markdown("---")
 st.subheader("📊 本日の栄養摂取状況とバランス")
 
-# 💡 左右に分割して、左に数字、右に円グラフを並べる！
 chart_col1, chart_col2 = st.columns([1, 1])
 
 with chart_col1:
@@ -400,14 +391,12 @@ with chart_col1:
             st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
 
 with chart_col2:
-    # 💡 グラフ用のデータを準備（残り枠がマイナスの時は0にする）
-    left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
+    left_cal = max(0, int(dinner_cal))
     
     raw_labels = ['朝食', '昼食', '夕食', '残り枠']
     raw_sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
     raw_colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
     
-    # 💡 【文字の重なり解消！】0のデータはグラフの部品から完全に除外する
     labels = []
     sizes = []
     colors = []
@@ -417,34 +406,21 @@ with chart_col2:
             sizes.append(s)
             colors.append(c)
             
-    # 何も入力されていない（または全部0）の時は、スッキリした1つのグレー円にする
     if len(sizes) == 0:
         sizes = [100]
         labels = ['1日の目標枠']
         colors = ['#e0e0e0']
     
-    # 💡 【真・文字化け対策】ちゃんと「日本語」が入っている美しいフォントを直接適用する！
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
-    import urllib.request
-    import os
-
-    # 1. 日本語対応のフォント（BIZ UDゴシック）をダウンロード
-    font_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
-    font_path = "BIZUDGothic-Regular.ttf"
-    if not os.path.exists(font_path):
-        try:
-            urllib.request.urlretrieve(font_url, font_path)
-        except:
-            pass
-            
-    # 2. フォントのデータを準備
+    
+    # フォントはキャッシュ化されているので爆速！
+    font_path = download_font_cached()
     if os.path.exists(font_path):
         fp = fm.FontProperties(fname=font_path)
     else:
         fp = fm.FontProperties(family='sans-serif')
     
-    # 3. グラフを描画（textpropsで直接日本語フォントを指定！）
     fig, ax = plt.subplots(figsize=(4, 4))
     wedges, texts, autotexts = ax.pie(
         sizes, 
@@ -453,15 +429,13 @@ with chart_col2:
         startangle=90, 
         colors=colors,
         textprops={'color': "black", 'size': 9, 'fontproperties': fp}, 
-        wedgeprops=dict(width=0.4, edgecolor='white') # ドーナツの幅
+        wedgeprops=dict(width=0.4, edgecolor='white')
     )
     plt.setp(autotexts, size=8, weight="bold", fontproperties=fp)
     ax.axis('equal')  
     
-    # Streamlitの画面にグラフを表示！
     st.pyplot(fig)
 
-# --- 8. AI相談室 ---
 # --- 8. AI相談室 ---
 if ai_persona == "高木先生モード":
     chat_placeholder = "高木先生にWeb3やライエットの相談をする"
@@ -472,7 +446,6 @@ else:
 
 st.markdown("---")
 
-# 🌟 1. 画像アップロードとタイミング選択
 uploaded_file = st.file_uploader("📸 食べたもの（またはこれから食べる予定）の画像をアップロード", type=["jpg", "jpeg", "png"])
 
 meal_timing = ""
@@ -484,17 +457,14 @@ if uploaded_file:
         horizontal=True
     )
 
-# 🌟 2. 夜ご飯提案ボタン
 suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
 
-# 🌟【最重要】重複送信ブレーキ用の記憶場所を初期化
 if 'last_analyzed_file' not in st.session_state:
     st.session_state['last_analyzed_file'] = None
 
 user_msg = None
 chat_input_val = st.chat_input(chat_placeholder)
 
-# 🌟 A. 新しい画像がアップロードされ、まだ1度も解析していない時だけの「自動1発処理」
 is_vision_mode = False
 if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
     is_vision_mode = True
@@ -502,13 +472,11 @@ if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != 
         user_msg = f"【画像解析リクエスト: {meal_timing}】これからこの料理を夜ご飯に食べようと思っています。画像から料理名の特定と推定カロリーを計算した上で、今日の残り枠に合うかどうかのアドバイスや、おすすめの食べ方を提案してください。"
     else:
         user_msg = f"【画像解析リクエスト: {meal_timing}】私はこの料理をすでに食べました。新しいメニューの提案は一切不要ですので、この画像に写っている料理の名前の特定と、その推定カロリーの計算だけを行ってください。"
-    st.session_state['last_analyzed_file'] = uploaded_file.name # 解析したよ！と記録してブレーキをかける
+    st.session_state['last_analyzed_file'] = uploaded_file.name
 
-# B. 通常の文字入力があった場合（2回目以降の雑談などは画像を送らないので超爆速）
 elif chat_input_val:
     user_msg = chat_input_val
 
-# C. 提案ボタンが押された場合
 elif suggest_button:
     try:
         df_menu_raw = pd.read_csv(MENU_FILE)
@@ -517,7 +485,6 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# 🌟 3. メッセージがあれば、大渋滞を防ぎつつGeminiを実行
 if user_msg:
     current_status = f"""
 [User Status Context]
@@ -528,10 +495,10 @@ if user_msg:
 - Total Calorie Intake Today: {int(total_cal)} kcal
   * Breakfast: {int(breakfast_cal)} kcal
   * Lunch: {int(lunch_cal)} kcal
+  * Dinner: {int(dinner_selected_cal)} kcal
 """
     sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
     
-    # 画像解析の初回時だけ、裏命令を合体
     if is_vision_mode:
         sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。ユーザーへの文面には普通に高木先生たちのセリフを書いてください。"
 
@@ -546,8 +513,7 @@ if user_msg:
 
     with st.spinner(spinner_msg):
         try:
-            # 🌟【ここがポイント】初回解析（is_vision_mode）の時だけ重い画像を一緒に送る！
-            # 2回目以降の普通のチャットの時は画像送信を完全にスキップして爆速化！
+            # 🌟 初回画像解析時のみ画像を送信して爆速化
             if is_vision_mode and uploaded_file is not None:
                 img = Image.open(uploaded_file)
                 response = model.generate_content([prompt, img])
@@ -557,7 +523,7 @@ if user_msg:
             ai_response_text = response.text
             extracted_cal = 0
             
-            # カロリータグの抜き取り処理
+            # 【CALORIE:数字】タグの処理
             if "【CALORIE:" in ai_response_text:
                 try:
                     parts = ai_response_text.split("【CALORIE:")
@@ -567,7 +533,7 @@ if user_msg:
                 except:
                     pass
             
-            # データをセッションに格納
+            # 🌟 ここで正しく「朝食・昼食・夕食」に振り分ける
             if extracted_cal > 0 and meal_timing:
                 if "朝食" in meal_timing:
                     st.session_state['vision_breakfast_cal'] = extracted_cal
@@ -576,7 +542,6 @@ if user_msg:
                 elif "夜ご飯" in meal_timing:
                     st.session_state['selected_dinner_cal'] = extracted_cal
             
-            # 吹き出し表示
             with st.chat_message("assistant", avatar=current_avatar):
                 if ai_persona == "高木先生モード":
                     bubble_class = "chat-bubble takagi-bubble"
@@ -587,19 +552,12 @@ if user_msg:
                 
                 st.markdown(f'<div class="{bubble_class}">{ai_response_text}</div>', unsafe_allow_html=True)
             
-            # カロリーが引かれたら、上のグラフを即座に更新するために1回だけリロード
             if extracted_cal > 0:
                 st.rerun()
             
         except Exception as e:
             st.error(f"AIエラー: {e}")
 
-# --- サイドバーの最下部にBGMを配置 ---
-with st.sidebar:
-    st.markdown("---")
-    st.write("🎵 BGM")
-    st.video("https://youtu.be/l7Tr8xb_tFk", format="video/mp4", start_time=0)
-# --- サイドバーの最下部にBGMを配置 ---
 with st.sidebar:
     st.markdown("---")
     st.write("🎵 BGM")
