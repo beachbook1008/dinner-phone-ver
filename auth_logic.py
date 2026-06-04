@@ -77,7 +77,6 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None):
     elif not st.secrets["db_backup_url"]:
         pass
     else:
-        # 🌟 バックアップ通信を裏側で非同期に走らせ、画面を一切待たせない仕掛け（爆速化）
         def run_backup_async(url, data_str):
             try:
                 import requests
@@ -131,7 +130,6 @@ def load_menu():
     except:
         return pd.DataFrame()
 
-# 🌟 毎回ダウンロードが走るのを防ぐため、キャッシュ関数化して爆速化！
 @st.cache_resource
 def download_font_cached():
     f_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
@@ -149,7 +147,7 @@ if 'is_logged_in' not in st.session_state: st.session_state['is_logged_in'] = Fa
 if 'show_register' not in st.session_state: st.session_state['show_register'] = False
 if 'selected_dinner' not in st.session_state: st.session_state['selected_dinner'] = None
 
-# 🌟 画像認識したカロリーを保存する場所（セッション状態）を初期化
+# 🌟 カロリー保存場所の初期化
 if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
 if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
 if 'selected_dinner_cal' not in st.session_state: st.session_state['selected_dinner_cal'] = 0
@@ -330,7 +328,7 @@ if b_items or l_items:
                 for item in l_items:
                     st.markdown(f"<p style='text-align: center; color: #666; font-size: 14px; font-weight: bold;'>✓ {item}</p>", unsafe_allow_html=True)
 
-# 🌟 カロリー統合計算（バグを完全修正し、朝・昼・夕の数字がズレないように統合）
+# 🌟 カロリー統合計算
 csv_breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum() if not df_menu.empty else 0
 csv_lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum() if not df_menu.empty else 0
 
@@ -414,7 +412,6 @@ with chart_col2:
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
     
-    # フォントはキャッシュ化されているので爆速！
     font_path = download_font_cached()
     if os.path.exists(font_path):
         fp = fm.FontProperties(fname=font_path)
@@ -469,9 +466,10 @@ is_vision_mode = False
 if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
     is_vision_mode = True
     if "夜ご飯" in meal_timing:
-        user_msg = f"【画像解析リクエスト: {meal_timing}】これからこの料理を夜ご飯に食べようと思っています。画像から料理名の特定と推定カロリーを計算した上で、今日の残り枠に合うかどうかのアドバイスや、おすすめの食べ方を提案してください。"
+        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
     else:
-        user_msg = f"【画像解析リクエスト: {meal_timing}】私はこの料理をすでに食べました。新しいメニューの提案は一切不要ですので、この画像に写っている料理の名前の特定と、その推定カロリーの計算だけを行ってください。"
+        # 🌟 雷さん等に「画像認識した事」と「昼食を食べた事実」を絶対にガン無視させないシステム命令
+        user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
     st.session_state['last_analyzed_file'] = uploaded_file.name
 
 elif chat_input_val:
@@ -499,21 +497,21 @@ if user_msg:
 """
     sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
     
+    # 🌟 初回画像解析時のみ、キャラクター指示のブレを潰して、正確な出力用タグを命令
     if is_vision_mode:
-        sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。ユーザーへの文面には普通に高木先生たちのセリフを書いてください。"
+        sys_prompt += f"\n\n【システムからの絶対命令】\n1. 回答の中で、必ず「画像を見たこと」と「ユーザーがすでに{meal_timing}を食べた（または食べる）事実」に明確に触れてください。\n2. 料理の推定カロリーを計算し、回答の「一番最後の行」に必ず半角数字で「【CALORIE:数字】」というタグを出力してください（例：【CALORIE:750】）。\n3. 文面は必ず現在のキャラクター（{ai_persona.strip()}）になりきって作成してください。"
 
     prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
     
     if ai_persona == "高木先生モード":
         spinner_msg = "AIプロンプトをメタバースに送信中... 🌐"
     elif ai_persona == "雷さん ":
-        spinner_msg = "雷さんが爆速でパケット解析中 ⚡"
+        spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡"
     else:
         spinner_msg = "AIがアドバイスを生成中..."
 
     with st.spinner(spinner_msg):
         try:
-            # 🌟 初回画像解析時のみ画像を送信して爆速化
             if is_vision_mode and uploaded_file is not None:
                 img = Image.open(uploaded_file)
                 response = model.generate_content([prompt, img])
@@ -523,17 +521,14 @@ if user_msg:
             ai_response_text = response.text
             extracted_cal = 0
             
-            # 【CALORIE:数字】タグの処理
-            if "【CALORIE:" in ai_response_text:
-                try:
-                    parts = ai_response_text.split("【CALORIE:")
-                    ai_response_text = parts[0]
-                    cal_digits = parts[1].replace("】", "").strip()
-                    extracted_cal = int(cal_digits)
-                except:
-                    pass
+            # 🌟 正規表現でどんなブレがあっても確実に【CALORIE:数字】を取得
+            import re
+            match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_response_text)
+            if match:
+                extracted_cal = int(match.group(1))
+                ai_response_text = re.sub(r'【CALORIE:\s*\d+\s*】', '', ai_response_text).strip()
             
-            # 🌟 ここで正しく「朝食・昼食・夕食」に振り分ける
+            # 🌟 取得したカロリーをセッションに正しいタイミングで振り分けて保存（バグを完全解消！）
             if extracted_cal > 0 and meal_timing:
                 if "朝食" in meal_timing:
                     st.session_state['vision_breakfast_cal'] = extracted_cal
