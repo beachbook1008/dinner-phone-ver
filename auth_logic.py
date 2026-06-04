@@ -20,9 +20,11 @@ takagirai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
+    # 🌟 エラーの元凶 transport="rest" を削除！
     genai.configure(api_key=api_key)
-    model_vision = genai.GenerativeModel('gemini-2.5-flash')       # 画像認識用
-    model_chat = genai.GenerativeModel('gemini-2.5-flash-lite')   # 雑談・提案用
+    # 🌟 発表用最強の2段構成モデル！
+    model_vision = genai.GenerativeModel('gemini-2.5-flash')       # 画像用
+    model_chat = genai.GenerativeModel('gemini-2.5-flash-lite')   # 雑談用
 else:
     st.error("APIキーがないよ！")
     st.stop()
@@ -321,13 +323,13 @@ chat_input_val = st.chat_input(chat_placeholder)
 user_msg = None
 is_vision_mode = False
 
-# 🌟 【バグ修正】uploaded_file が「本当にある時だけ」ハッシュを読み込むように完全ガード！
+# 🌟 画像がある時だけハッシュチェック（安全ガード）
 if uploaded_file and meal_timing:
     try:
         file_bytes = uploaded_file.getvalue()
         current_file_hash = hashlib.md5(file_bytes).hexdigest() + f"_{meal_timing}"
         
-        if st.session_state['last_analyzed_hash'] != current_file_hash:
+        if st.session_state.get('last_analyzed_hash') != current_file_hash:
             is_vision_mode = True
             if "夜ご飯" in meal_timing:
                 user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。これからこれを夜ご飯に食べようと思っています。画像から料理名を特定し、カロリーを計算してアドバイスをください。"
@@ -337,12 +339,13 @@ if uploaded_file and meal_timing:
     except:
         pass
 
-# 画像がない、または解析済みなら通常のテキスト入力やボタン判定へ安全に流す
+# 画像がない、または解析済みなら通常のテキスト入力やボタン判定へ
 if not user_msg:
     if chat_input_val:
         user_msg = chat_input_val
     elif suggest_button:
         try:
+            # 🌟 pd.csvのタイポを完全修正！
             df_menu_raw = pd.read_csv(MENU_FILE) if os.path.exists(MENU_FILE) else pd.DataFrame()
             menu_data = df_menu_raw.to_csv(index=False)
             user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
@@ -373,6 +376,7 @@ if user_msg:
 
     with st.spinner(spinner_msg):
         try:
+            # 🌟 ここで彩音さん設計の2段構成モデルを発動！
             if is_vision_mode and uploaded_file is not None:
                 img = Image.open(uploaded_file)
                 response = model_vision.generate_content([prompt, img])
@@ -453,6 +457,7 @@ with st.chat_message("assistant", avatar=current_avatar):
     if ai_printed_text:
         st.markdown(f'<div class="{bubble_class}">{ai_printed_text}</div>', unsafe_allow_html=True)
     else:
+        # 通常の挨拶時はAPIを叩かずに節約
         if dinner_cal > 500:
             msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
         elif dinner_cal > 0:
