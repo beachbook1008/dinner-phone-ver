@@ -5,6 +5,7 @@ import google.generativeai as genai
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from PIL import Image
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
@@ -453,7 +454,19 @@ elif ai_persona == "フォーマル":
     chat_placeholder = "AIアシスタントに論理的な相談をする"
 else:
     chat_placeholder = "雷さんに相談"
+# --- ここから追加 ---
+st.markdown("---")
+# 画像アップロード機能（任意）
+uploaded_file = st.file_uploader("📸 食べたものの画像をアップロード（任意）", type=["jpg", "jpeg", "png"])
 
+if uploaded_file:
+    # アップロードされたら小さくプレビュー表示しておく
+    st.image(uploaded_file, caption="送信準備完了", width=250)
+# --- ここまで追加 ---
+
+# （既存のコード）
+# if user_msg := st.chat_input("メッセージを入力..."):
+# ...
 if user_msg := st.chat_input(chat_placeholder):
     with st.chat_message("assistant", avatar=current_avatar):
         # 1. 各種変数の状況を、AIがパッと理解できる構造化テキストにする
@@ -485,7 +498,11 @@ if user_msg := st.chat_input(chat_placeholder):
         # 💡 try-except の外側を with st.spinner() で囲む
         with st.spinner(spinner_msg):
             try:
-                response = model.generate_content(prompt)
+                if uploaded_file is not None:
+                    img = Image.open(uploaded_file)
+                    response = model.generate_content([prompt, img])
+                else:
+                    response = model.generate_content(prompt)
                 
                 # キャラクターに応じた吹き出しクラスを再度判定
                 if ai_persona == "高木先生モード":
