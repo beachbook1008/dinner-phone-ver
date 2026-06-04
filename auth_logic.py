@@ -392,6 +392,90 @@ if user_msg:
     prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
     spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡" if ai_persona == "雷さん " else "AIがアドバイスを生成中..."
 
+    # 🌟 【デバッグ機能】サイドバーのステータス表示の下あたりに状態を表示
+    with st.sidebar:
+        st.markdown(f"**🔧 Debug Status**\n- Vision Mode: `{is_vision_mode}`\n- Hash: `{st.session_state.get('last_analyzed_hash')[:8] if st.session_state.get('last_analyzed_hash') else 'None'}`")
+
+    with st.spinner(spinner_msg):
+        try:
+            if is_vision_mode and uploaded_file is not None:
+                img = Image.open(uploaded_file)
+                response = model_vision.generate_content([prompt, img])
+            else:
+                response = model_chat.generate_content(prompt)
+            
+            ai_printed_text = response.text
+            extracted_cal = 0
+            food_name = ""
+            
+            if is_vision_mode:
+                try:
+                    json_match = re.search(r'```json\s*(\{.*?\})\s*```', ai_printed_text, re.DOTALL)
+                    if not json_match:
+                        json_match = re.search(r'(\{.*?\})', ai_printed_text, re.DOTALL)
+                        
+                    if json_match:
+                        json_str = json_match.group(1)
+                        ai_printed_text = ai_printed_text.replace(json_match.group(0), "").strip()
+                        
+                        data = json.loads(json_str)
+                        food_name = data.get("food_name", "")
+                        extracted_cal = int(data.get("calorie", 0))
+                    else:
+                        st.warning("⚠️ AIの応答からJSONフォーマットを検出できませんでした。")
+                except Exception as json_err:
+                    st.error(f"⚠️ JSON解析エラー (パース失敗): {json_err}")
+                    st.text(f"AIの生応答: {ai_printed_text}")
+            
+            if extracted_cal > 0 and meal_timing:
+                if "朝食" in meal_timing:
+                    st.session_state['vision_breakfast_cal'] = extracted_cal
+                    st.session_state['breakfast_food_name'] = food_name
+                elif "昼食" in meal_timing:
+                    st.session_state['vision_lunch_cal'] = extracted_cal
+                    st.session_state['lunch_food_name'] = food_name
+                elif "夜ご飯" in meal_timing:
+                    st.session_state['selected_dinner_cal'] = extracted_cal
+                    st.session_state['dinner_food_name'] = food_name
+                    
+                if food_name:
+                    st.toast(f"🍳 AI画像認識成功: 「{food_name}」", icon="✨")
+                    
+        except Exception as e:
+            # 🌟 エラーを隠さず、画面に赤文字でバシッと本当の原因を表示！
+            st.error(f"❌ 画像認識エラー (本当の原因): {e}")
+            extracted_cal = 600
+            food_name = "自動判定フード"
+ai_printed_text = ""
+if user_msg:
+    tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
+    tmp_target = (tmp_bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
+    tmp_csv_b = df_menu[df_menu['display'].isin(st.session_state.get('b_items_sel', []))]['cal'].sum() if not df_menu.empty else 0
+    tmp_csv_l = df_menu[df_menu['display'].isin(st.session_state.get('l_items_sel', []))]['cal'].sum() if not df_menu.empty else 0
+    
+    current_status = f"""
+[User Status Context]
+- Target Weight: {user_row['target_weight']} kg
+- Current Weight: {weight} kg
+- Activity Level Factor: {activity}
+- Remaining Calorie Budget for Dinner: {int(tmp_target - (tmp_csv_b + st.session_state['vision_breakfast_cal']) - (tmp_csv_l + st.session_state['vision_lunch_cal']))} kcal
+"""
+    sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
+    
+    if is_vision_mode:
+        sys_prompt += f"\n\n【システムからの絶対命令】\n" \
+                      f"1. あなたの発言（セリフ）の文章とは別に、必ず回答の「一番最後の行」に料理の名前と推定カロリーを以下の仕様のJSONフォーマットだけで出力してください。他の文字を混ぜてはいけません。\n" \
+                      f"```json\n" \
+                      f"{{\n" \
+                      f"  \"food_name\": \"特定した料理名\",\n" \
+                      f"  \"calorie\": 123\n" \
+                      f"}}\n" \
+                      f"```\n" \
+                      f"2. 文面は必ず現在のキャラクター（{ai_persona.strip()}）なりきって「画像を見た事実」や「{meal_timing}に食べた事実」に明確に触れて作成してください。"
+
+    prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
+    spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡" if ai_persona == "雷さん " else "AIがアドバイスを生成中..."
+
     with st.spinner(spinner_msg):
         try:
             if is_vision_mode and uploaded_file is not None:
