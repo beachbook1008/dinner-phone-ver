@@ -343,7 +343,7 @@ if not user_msg:
         user_msg = chat_input_val
     elif suggest_button:
         try:
-            df_menu_raw = pd.csv(MENU_FILE) if os.path.exists(MENU_FILE) else pd.DataFrame()
+            df_menu_raw = pd.read_csv(MENU_FILE) if os.path.exists(MENU_FILE) else pd.DataFrame()
             menu_data = df_menu_raw.to_csv(index=False)
             user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
         except Exception as e:
