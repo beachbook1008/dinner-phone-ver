@@ -487,24 +487,24 @@ if uploaded_file:
 # 🌟 2. 夜ご飯提案ボタン
 suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
 
-# 前回解析した画像の名前を記憶して、二重に解析するのを防ぐ
+# 🌟【最重要】重複送信ブレーキ用の記憶場所を初期化
 if 'last_analyzed_file' not in st.session_state:
     st.session_state['last_analyzed_file'] = None
 
 user_msg = None
 chat_input_val = st.chat_input(chat_placeholder)
 
-# A. 新しい画像がアップロードされ、まだ解析していない場合の自動処理
+# 🌟 A. 新しい画像がアップロードされ、まだ1度も解析していない時だけの「自動1発処理」
+is_vision_mode = False
 if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
-    # 🌟 選ばれたボタンによって、AIへの命令を細かく切り替える
+    is_vision_mode = True
     if "夜ご飯" in meal_timing:
         user_msg = f"【画像解析リクエスト: {meal_timing}】これからこの料理を夜ご飯に食べようと思っています。画像から料理名の特定と推定カロリーを計算した上で、今日の残り枠に合うかどうかのアドバイスや、おすすめの食べ方を提案してください。"
     else:
         user_msg = f"【画像解析リクエスト: {meal_timing}】私はこの料理をすでに食べました。新しいメニューの提案は一切不要ですので、この画像に写っている料理の名前の特定と、その推定カロリーの計算だけを行ってください。"
-        
-    st.session_state['last_analyzed_file'] = uploaded_file.name # 解析済みに記録
+    st.session_state['last_analyzed_file'] = uploaded_file.name # 解析したよ！と記録してブレーキをかける
 
-# B. 通常のチャット入力があった場合
+# B. 通常の文字入力があった場合（2回目以降の雑談などは画像を送らないので超爆速）
 elif chat_input_val:
     user_msg = chat_input_val
 
@@ -517,7 +517,7 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# 🌟 3. メッセージがあれば、チャットメッセージの「外側」でGeminiの通信を実行
+# 🌟 3. メッセージがあれば、大渋滞を防ぎつつGeminiを実行
 if user_msg:
     current_status = f"""
 [User Status Context]
@@ -531,9 +531,9 @@ if user_msg:
 """
     sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
     
-    is_vision_mode = "【画像解析リクエスト:" in user_msg
+    # 画像解析の初回時だけ、裏命令を合体
     if is_vision_mode:
-        sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。"
+        sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。ユーザーへの文面には普通に高木先生たちのセリフを書いてください。"
 
     prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
     
@@ -544,9 +544,10 @@ if user_msg:
     else:
         spinner_msg = "AIがアドバイスを生成中..."
 
-    # 🌟 まずは画面全体でスピナー（ローディング）を回してGeminiを走らせる
     with st.spinner(spinner_msg):
         try:
+            # 🌟【ここがポイント】初回解析（is_vision_mode）の時だけ重い画像を一緒に送る！
+            # 2回目以降の普通のチャットの時は画像送信を完全にスキップして爆速化！
             if is_vision_mode and uploaded_file is not None:
                 img = Image.open(uploaded_file)
                 response = model.generate_content([prompt, img])
@@ -556,6 +557,7 @@ if user_msg:
             ai_response_text = response.text
             extracted_cal = 0
             
+            # カロリータグの抜き取り処理
             if "【CALORIE:" in ai_response_text:
                 try:
                     parts = ai_response_text.split("【CALORIE:")
@@ -565,6 +567,7 @@ if user_msg:
                 except:
                     pass
             
+            # データをセッションに格納
             if extracted_cal > 0 and meal_timing:
                 if "朝食" in meal_timing:
                     st.session_state['vision_breakfast_cal'] = extracted_cal
@@ -573,7 +576,7 @@ if user_msg:
                 elif "夜ご飯" in meal_timing:
                     st.session_state['selected_dinner_cal'] = extracted_cal
             
-            # 🌟 Geminiの返事が完成した「後」で、チャットの枠（吹き出し）を作成して表示する
+            # 吹き出し表示
             with st.chat_message("assistant", avatar=current_avatar):
                 if ai_persona == "高木先生モード":
                     bubble_class = "chat-bubble takagi-bubble"
@@ -584,13 +587,18 @@ if user_msg:
                 
                 st.markdown(f'<div class="{bubble_class}">{ai_response_text}</div>', unsafe_allow_html=True)
             
-            # カロリーが引かれたら、上のグラフを即座に更新するためにリロード
+            # カロリーが引かれたら、上のグラフを即座に更新するために1回だけリロード
             if extracted_cal > 0:
                 st.rerun()
             
         except Exception as e:
             st.error(f"AIエラー: {e}")
 
+# --- サイドバーの最下部にBGMを配置 ---
+with st.sidebar:
+    st.markdown("---")
+    st.write("🎵 BGM")
+    st.video("https://youtu.be/l7Tr8xb_tFk", format="video/mp4", start_time=0)
 # --- サイドバーの最下部にBGMを配置 ---
 with st.sidebar:
     st.markdown("---")
