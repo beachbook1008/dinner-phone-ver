@@ -487,15 +487,23 @@ if uploaded_file:
 # 🌟 2. 夜ご飯提案ボタン
 suggest_button = st.button("🍽️ AIに夜ご飯を提案してもらう！（dinner_listから選択）")
 
-# 🌟 3. メッセージの組み立て
+# 前回解析した画像の名前を記憶して、二重に解析するのを防ぐ
+if 'last_analyzed_file' not in st.session_state:
+    st.session_state['last_analyzed_file'] = None
+
 user_msg = None
 chat_input_val = st.chat_input(chat_placeholder)
 
-if chat_input_val:
-    user_msg = chat_input_val
-    if uploaded_file and meal_timing:
-        user_msg = f"【画像情報: {meal_timing}】\n" + user_msg
+# A. 新しい画像がアップロードされ、まだ解析していない場合の自動処理
+if uploaded_file and meal_timing and (st.session_state['last_analyzed_file'] != uploaded_file.name):
+    user_msg = f"【画像解析リクエスト: {meal_timing}】この画像に写っている料理の特定と、カロリー推定をお願いします。"
+    st.session_state['last_analyzed_file'] = uploaded_file.name # 解析済みに記録
 
+# B. 通常のチャット入力があった場合
+elif chat_input_val:
+    user_msg = chat_input_val
+
+# C. 提案ボタンが押された場合
 elif suggest_button:
     try:
         df_menu_raw = pd.read_csv(MENU_FILE)
@@ -504,10 +512,9 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# 🌟 4. メッセージがあればGeminiの処理を走らせる
+# 🌟 3. メッセージがあれば、チャットメッセージの「外側」でGeminiの通信を実行
 if user_msg:
-    with st.chat_message("assistant", avatar=current_avatar):
-        current_status = f"""
+    current_status = f"""
 [User Status Context]
 - Target Weight: {user_row['target_weight']} kg
 - Current Weight: {weight} kg
@@ -517,52 +524,52 @@ if user_msg:
   * Breakfast: {int(breakfast_cal)} kcal
   * Lunch: {int(lunch_cal)} kcal
 """
-        sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
-        
-        # 🌟 画像がある場合、AIに最後に特定の形式でカロリーを出力させる秘密の命令を足す
-        if uploaded_file and meal_timing:
-            sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。ユーザーへのメッセージ中には普通に解説を書いて構いません。"
+    sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
+    
+    is_vision_mode = "【画像解析リクエスト:" in user_msg
+    if is_vision_mode:
+        sys_prompt += "\n【重要】画像から料理の推定カロリーを計算し、回答の「一番最後」に必ず「【CALORIE:数字】」という形式で半角数字だけで出力してください。例：【CALORIE:750】。"
 
-        prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
-        
-        if ai_persona == "高木先生モード":
-            spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
-        elif ai_persona == "雷さん ":
-            spinner_msg = "雷さんが美味しいお店を爆速検索中"
-        else:
-            spinner_msg = "AIが論理的なアドバイスを生成しています... "
+    prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
+    
+    if ai_persona == "高木先生モード":
+        spinner_msg = "AIプロンプトをメタバースに送信中... 🌐"
+    elif ai_persona == "雷さん ":
+        spinner_msg = "雷さんが爆速でパケット解析中 ⚡"
+    else:
+        spinner_msg = "AIがアドバイスを生成中..."
 
-        with st.spinner(spinner_msg):
-            try:
-                if uploaded_file is not None:
-                    img = Image.open(uploaded_file)
-                    response = model.generate_content([prompt, img])
-                else:
-                    response = model.generate_content(prompt)
-                
-                ai_response_text = response.text
-                extracted_cal = 0
-                
-                # 🌟 AIの返答から「【CALORIE:数字】」を隠して、数字だけを抜き取る処理
-                if "【CALORIE:" in ai_response_text:
-                    try:
-                        parts = ai_response_text.split("【CALORIE:")
-                        ai_response_text = parts[0]  # ユーザーに見せる画面からは【CALORIE:〜】を消す
-                        cal_digits = parts[1].replace("】", "").strip()
-                        extracted_cal = int(cal_digits)
-                    except:
-                        pass
-                
-                # 🌟 抜き取ったカロリーを選択されたタイミングのデータに保存する
-                if extracted_cal > 0 and meal_timing:
-                    if "朝食" in meal_timing:
-                        st.session_state['vision_breakfast_cal'] = extracted_cal
-                    elif "昼食" in meal_timing:
-                        st.session_state['vision_lunch_cal'] = extracted_cal
-                    elif "夜ご飯" in meal_timing:
-                        st.session_state['selected_dinner_cal'] = extracted_cal
-                
-                # キャラクターに応じた吹き出しクラスの判定
+    # 🌟 まずは画面全体でスピナー（ローディング）を回してGeminiを走らせる
+    with st.spinner(spinner_msg):
+        try:
+            if is_vision_mode and uploaded_file is not None:
+                img = Image.open(uploaded_file)
+                response = model.generate_content([prompt, img])
+            else:
+                response = model.generate_content(prompt)
+            
+            ai_response_text = response.text
+            extracted_cal = 0
+            
+            if "【CALORIE:" in ai_response_text:
+                try:
+                    parts = ai_response_text.split("【CALORIE:")
+                    ai_response_text = parts[0]
+                    cal_digits = parts[1].replace("】", "").strip()
+                    extracted_cal = int(cal_digits)
+                except:
+                    pass
+            
+            if extracted_cal > 0 and meal_timing:
+                if "朝食" in meal_timing:
+                    st.session_state['vision_breakfast_cal'] = extracted_cal
+                elif "昼食" in meal_timing:
+                    st.session_state['vision_lunch_cal'] = extracted_cal
+                elif "夜ご飯" in meal_timing:
+                    st.session_state['selected_dinner_cal'] = extracted_cal
+            
+            # 🌟 Geminiの返事が完成した「後」で、チャットの枠（吹き出し）を作成して表示する
+            with st.chat_message("assistant", avatar=current_avatar):
                 if ai_persona == "高木先生モード":
                     bubble_class = "chat-bubble takagi-bubble"
                 elif ai_persona == "雷さん ":
@@ -570,15 +577,14 @@ if user_msg:
                 else:
                     bubble_class = "chat-bubble"
                 
-                # AIの返答を表示
                 st.markdown(f'<div class="{bubble_class}">{ai_response_text}</div>', unsafe_allow_html=True)
-                
-                # 🌟 カロリーが新しく登録されたら、上のグラフや数値を更新するために画面を再起動
-                if extracted_cal > 0:
-                    st.rerun()
-                
-            except Exception as e:
-                st.error(f"AIエラー: {e}")
+            
+            # カロリーが引かれたら、上のグラフを即座に更新するためにリロード
+            if extracted_cal > 0:
+                st.rerun()
+            
+        except Exception as e:
+            st.error(f"AIエラー: {e}")
 
 # --- サイドバーの最下部にBGMを配置 ---
 with st.sidebar:
