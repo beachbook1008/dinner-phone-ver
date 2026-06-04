@@ -20,6 +20,7 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
+    # 🌟 1日1500回制限の安定版モデルへ完璧に切り替え（404エラー対策済）
     model = genai.GenerativeModel('models/gemini-1.5-flash')
 else:
     st.error("APIキーがないよ！")
@@ -146,7 +147,7 @@ if 'is_logged_in' not in st.session_state: st.session_state['is_logged_in'] = Fa
 if 'show_register' not in st.session_state: st.session_state['show_register'] = False
 if 'selected_dinner' not in st.session_state: st.session_state['selected_dinner'] = None
 
-# 🌟 カロリー保存場所の初期化
+# カロリー保存場所の初期化
 if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
 if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
 if 'selected_dinner_cal' not in st.session_state: st.session_state['selected_dinner_cal'] = 0
@@ -255,7 +256,7 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
         st.rerun()
     st.stop()
 
-# --- サイドバーの設定（計算の前に配置して値を即時反映） ---
+# --- サイドバーの設定（値を即時反映させるため上部に配置） ---
 with st.sidebar:
     if takagirai_img:
         st.image(takagirai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
@@ -298,7 +299,7 @@ with st.container(border=True):
 
 st.markdown("---")
 
-# --- 4. メッセージ・画像・提案入力 UI配置 ---
+# --- 4. 画像・チャット入力 UI配置 ---
 if ai_persona == "高木先生モード":
     chat_placeholder = "高木先生にWeb3やライエットの相談をする"
 elif ai_persona == "フォーマル":
@@ -338,10 +339,9 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# --- 5. AI相談のリアルタイム処理（表示・計算の前に1発で完結させる） ---
+# --- 5. AI相談のリアルタイム処理（表示の前に完結させて計算ズレを完全に防ぐ） ---
 ai_printed_text = ""
 if user_msg:
-    # 暫定カロリー計算（最新のステータスをAIに伝えるため）
     tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
     tmp_target = (tmp_bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
     tmp_csv_b = df_menu[df_menu['display'].isin(st.session_state.get('b_items_sel', []))]['cal'].sum() if not df_menu.empty else 0
@@ -359,7 +359,7 @@ if user_msg:
         sys_prompt += f"\n\n【システムからの絶対命令】\n1. 回答の中で、必ず「画像を見たこと」と「ユーザーがすでに{meal_timing}を食べた（または食べる）事実」に明確に触れてください。\n2. 料理の推定カロリーを計算し、回答の「一番最後の行」に必ず半角数字で「【CALORIE:数字】」というタグを出力してください（例：【CALORIE:750】）。\n3. 文面は必ず現在のキャラクター（{ai_persona.strip()}）になりきって作成してください。"
 
     prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
-    spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡" if ai_persona == "雷さん " else "AIプロンプトを送信中... 🌐"
+    spinner_msg = "雷さんが画像を爆速でパケット解析中 ⚡" if ai_persona == "雷さん " else "AIがアドバイスを生成中..."
 
     with st.spinner(spinner_msg):
         try:
@@ -372,6 +372,7 @@ if user_msg:
             ai_printed_text = response.text
             extracted_cal = 0
             
+            # 正規表現で確実に数字だけを抜き取る
             match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_printed_text)
             if match:
                 extracted_cal = int(match.group(1))
@@ -388,7 +389,7 @@ if user_msg:
         except Exception as e:
             st.error(f"AIエラー: {e}")
 
-# --- 6. カロリーの確定計算とメニュー選択 ---
+# --- 6. 確定したカロリー計算とメニューのセレクトボックス表示 ---
 bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
 target_cal = (bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
 
@@ -426,7 +427,7 @@ dinner_cal = target_cal - breakfast_cal - lunch_cal
 
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
 
-# --- 7. 自動挨拶 & AI相談室のチャット表示 ---
+# --- 7. 自動挨拶 & AI相談のチャット表示（リランなしでリアルタイム連動） ---
 st.divider()
 
 if ai_persona == "高木先生モード":
@@ -439,7 +440,6 @@ else:
     current_avatar = "🤖"
     bubble_class = "chat-bubble"
 
-# AI相談の返答がある場合はそちらを優先表示、ない場合は通常の挨拶を表示
 with st.chat_message("assistant", avatar=current_avatar):
     if ai_printed_text:
         st.markdown(f'<div class="{bubble_class}">{ai_printed_text}</div>', unsafe_allow_html=True)
