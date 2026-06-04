@@ -339,7 +339,10 @@ if uploaded_file and meal_timing:
     try:
         file_bytes = uploaded_file.getvalue()
         current_file_hash = hashlib.md5(file_bytes).hexdigest() + f"_{meal_timing}"
-        
+        # 🌟 原因特定のために、画面の最上部にこれを1回だけ貼り付けてみてください！
+        st.write(f"📸 画像ファイル名: {uploaded_file.name}")
+        st.write(f"💡 選択された区分: {meal_timing}")
+        st.write(f"⚡ 解析モード突入判定: {st.session_state.get('last_analyzed_hash') != current_file_hash}")
         if st.session_state.get('last_analyzed_hash') != current_file_hash:
             is_vision_mode = True
             if "夜ご飯" in meal_timing:
@@ -347,7 +350,7 @@ if uploaded_file and meal_timing:
             else:
                 user_msg = f"【システム通知】ユーザーが「{meal_timing}」の画像を送信しました。ユーザーはすでにこの料理を食べ終わっています。画像から料理を認識し、「〇〇を食べたんだな！」「画像を見たぞ！」と、画像認識をしたことと、{meal_timing}を食べた事実を明確に受け止めるリアクションをしてください（※代わりのメニュー提案は一切不要です）。"
             st.session_state['last_analyzed_hash'] = current_file_hash
-    except:
+    except Exception:
         pass
 
 if not user_msg:
