@@ -4,3 +4,6 @@ google-generativeai
 python-dotenv
 requests
 matplotlib
+google-search-results
+requests
+beautifulsoup4
