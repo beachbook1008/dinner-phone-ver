@@ -19,9 +19,9 @@ takagirai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
-    genai.configure(api_key=api_key, transport="rest")
-    # 🌟 404エラーを絶対に起こさない1日1500回制限の安定版モデル（-latest付き）
-    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+    # 🌟 404エラーの原因だった「transport="rest"」を削除し、最も安定して1日1500回使えるモデルに修正
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-1.5-flash')
 else:
     st.error("APIキーがないよ！")
     st.stop()
@@ -256,7 +256,7 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
         st.rerun()
     st.stop()
 
-# --- サイドバーの設定（計算前に配置し、値をリアルタイムで反映） ---
+# --- サイドバーの設定 ---
 with st.sidebar:
     if takagirai_img:
         st.image(takagirai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
@@ -339,7 +339,7 @@ elif suggest_button:
     except Exception as e:
         user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# --- 5. AI相談のリアルタイム処理（表示・計算の前に1発で処理を完結させて爆速化） ---
+# --- 5. AI相談のリアルタイム処理（表示・計算の前に1発で完結させて超爆速化） ---
 ai_printed_text = ""
 if user_msg:
     tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
@@ -372,7 +372,6 @@ if user_msg:
             ai_printed_text = response.text
             extracted_cal = 0
             
-            # 正規表現で確実に数字だけをハック
             match = re.search(r'【CALORIE:\s*(\d+)\s*】', ai_printed_text)
             if match:
                 extracted_cal = int(match.group(1))
@@ -452,7 +451,7 @@ with st.chat_message("assistant", avatar=current_avatar):
             msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
         if ai_persona != "高木先生モード":
             if dinner_cal > 500:
-                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
+                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
             elif dinner_cal > 0:
                 msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
             else:
