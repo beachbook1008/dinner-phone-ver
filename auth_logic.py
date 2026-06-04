@@ -13,7 +13,7 @@ import json
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
-rai_avatar = "mii_thunder.jpg" if os.path.exists("mii_thunder.jpg") else "⚡️"
+rai_avatar = "mii_thunder.jpg" if os.path.exists("mii_thunder.jpg") else "👨‍🏫"
 all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
 takagirai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
@@ -149,7 +149,7 @@ if 'is_logged_in' not in st.session_state: st.session_state['is_logged_in'] = Fa
 if 'show_register' not in st.session_state: st.session_state['show_register'] = False
 if 'selected_dinner' not in st.session_state: st.session_state['selected_dinner'] = None
 
-# カろリー＆料理名保存場所の初期化
+# カロリー＆料理名保存場所の初期化
 if 'vision_breakfast_cal' not in st.session_state: st.session_state['vision_breakfast_cal'] = 0
 if 'vision_lunch_cal' not in st.session_state: st.session_state['vision_lunch_cal'] = 0
 if 'selected_dinner_cal' not in st.session_state: st.session_state['selected_dinner_cal'] = 0
@@ -339,7 +339,7 @@ if uploaded_file and meal_timing:
         file_bytes = uploaded_file.getvalue()
         current_file_hash = hashlib.md5(file_bytes).hexdigest() + f"_{meal_timing}"
         
-        # 🌟 ハッシュロックのフライング保存を消去（成功時のみロックする仕様へ変更）
+        # 🌟 ハッシュロック判定（解析成功時のみロックする仕様）
         if st.session_state.get('last_analyzed_hash') != current_file_hash:
             is_vision_mode = True
             if "夜ご飯" in meal_timing:
@@ -360,7 +360,7 @@ if not user_msg:
         except Exception as e:
             user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
 
-# --- 5. AI相談のリアルタイム処理（一本化・最新仕様） ---
+# --- 5. AI相談のリアルタイム処理（一本化・最新迎撃版） ---
 ai_printed_text = ""
 if user_msg:
     tmp_bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
@@ -440,7 +440,7 @@ if user_msg:
             if is_vision_mode:
                 st.info(f"📋 **解析判定ログ** | food=`{food_name}` | cal=`{extracted_cal}kcal` | vision_mode=`{is_vision_mode}`")
 
-            # 🌟 抽出完了（成功時）のみデータを各時間帯に代入し、ここで初めてハッシュロックをかける仕様
+            # 🌟 抽出完了（成功時）のみデータを各時間帯に代入し、ここでハッシュロックをかける
             if extracted_cal > 0 and meal_timing:
                 if "朝食" in meal_timing:
                     st.session_state['vision_breakfast_cal'] = extracted_cal
@@ -458,7 +458,10 @@ if user_msg:
                     st.toast(f"🍳 AI画像認識成功: 「{food_name}」", icon="✨")
                     
         except Exception as e:
-            # 万が一の回数制限（429）や切断時のためのスマートな自動判定フォールバック
+            # 🌟 犯人の正体を暴くために、画面にエラーの型と内容を強制表示！
+            st.error(f"🔥 Vision例外発生: {type(e).__name__}")
+            st.error(f"🔥 例外内容: {e}")
+
             extracted_cal = 600
             food_name = "画像解析メニュー（自動判定）"
             if is_vision_mode:
@@ -515,7 +518,7 @@ lunch_cal = csv_lunch_cal + st.session_state['vision_lunch_cal']
 dinner_selected_cal = st.session_state['selected_dinner_cal']
 
 total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
-# 🌟 残り枠計算から夕食(dinner_selected_cal)を引き忘れる重大なバグを完全消滅
+# 🌟 残り枠計算の引き算修正
 dinner_cal = target_cal - breakfast_cal - lunch_cal - dinner_selected_cal
 
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
@@ -545,7 +548,7 @@ with st.chat_message("assistant", avatar=current_avatar):
             msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
         if ai_persona != "高木先生モード":
             if dinner_cal > 500:
-                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
+                msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
             elif dinner_cal > 0:
                 msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
             else:
@@ -603,5 +606,5 @@ with chart_col2:
 with st.sidebar:
     st.markdown("---")
     st.write("🎵 BGM")
-    # 🌟 完全プレーン化された動画URL
-    st.video("https://youtu.be/l7Tr8xb_tFk")
+    # 🌟 YouTubeリンクのゴミを排除しプレーンURLに修正
+    st.video("[https://youtu.be/l7Tr8xb_tFk](https://youtu.be/l7Tr8xb_tFk)")
