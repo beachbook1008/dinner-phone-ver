@@ -606,5 +606,4 @@ with chart_col2:
 with st.sidebar:
     st.markdown("---")
     st.write("🎵 BGM")
-    # 🌟 YouTubeリンクのゴミを排除しプレーンURLに修正
-    st.video("[https://youtu.be/l7Tr8xb_tFk](https://youtu.be/l7Tr8xb_tFk)")
+    st.video("https://youtu.be/l7Tr8xb_tFk")  # ⭕ 完全なプレーンURLにする
