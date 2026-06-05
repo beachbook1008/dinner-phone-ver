@@ -458,14 +458,15 @@ if user_msg:
                     st.toast(f"🍳 AI画像認識成功: 「{food_name}」", icon="✨")
                     
         except Exception as e:
-            # 🌟 犯人の正体を暴くために、画面にエラーの型と内容を強制表示！
             st.error(f"🔥 Vision例外発生: {type(e).__name__}")
             st.error(f"🔥 例外内容: {e}")
 
             extracted_cal = 600
             food_name = "画像解析メニュー（自動判定）"
             if is_vision_mode:
-                ai_printed_text = "【システム通知: 自動判定モード起動】\nAPI接続制限を検知したため、システムを自動判定モードに切り替えました。\n\n画像の料理データをプログラム側で安全に自動算出（一律600kcal）し、計算を継続します。デモの実演には影響ありません。"
+                # 🌟 = ではなく += にして、AIの本来のセリフ（または枠）の前にシステム通知を「付け足す」形にします！
+                system_notice = "【システム通知: 自動判定モード起動】\nAPI接続制限を検知したため、システムを自動判定モードに切り替えました。\n\n画像の料理データをプログラム側で安全に自動算出（一律600kcal）し、計算を継続します。デモの実演には影響ありません。"
+                ai_printed_text = f"{system_notice}\n\n{ai_printed_text}" if ai_printed_text else system_notice
                 st.session_state['last_analyzed_hash'] = current_file_hash
 
 # --- 6. 確定したカロリー計算とメニューのセレクトボックス表示 ---
@@ -540,19 +541,31 @@ with st.chat_message("assistant", avatar=current_avatar):
     if ai_printed_text:
         st.markdown(f'<div class="{bubble_class}">{ai_printed_text}</div>', unsafe_allow_html=True)
     else:
-        if dinner_cal > 500:
-            msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
-        elif dinner_cal > 0:
-            msg = f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！"
+        # 🌟 高木先生モードの初期挨拶
+        if ai_persona == "高木先生モード":
+            if dinner_cal > 500:
+                msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね。This is perfect！素晴らしい投資効率（ROI）ですよ。夜は美味しいものを楽しんでくださいね！"
+            elif dinner_cal > 0:
+                msg = f"順調にコントロールできていますね。Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ。この調子で頑張りましょう！"
+            else:
+                msg = f"Oh... カロリーオーバーしてしまいましたね。でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
+        
+        # 🌟 フォーマルモードの初期挨拶
+        elif ai_persona == "フォーマル ":
+            if dinner_cal > 0:
+                msg = f"お疲れ様です、{user_id}さん。現在の残りカロリーは {int(dinner_cal)}kcal です。目標達成に向けて順調なペースを維持しています。この調子で管理を継続しましょう。"
+            else:
+                msg = f"カロリー制限値を超過しています。本日の摂取傾向を分析し、明日の食事メニューで調整を行うことを推奨します。"
+                
+        # 🌟 雷さんモードの初期挨拶（デフォルト）
         else:
-            msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
-        if ai_persona != "高木先生モード":
             if dinner_cal > 500:
                 msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
             elif dinner_cal > 0:
                 msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
             else:
                 msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
+                
         st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 
 # --- 8. 栄養摂取状況グラフの表示 ---
