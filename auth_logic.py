@@ -181,13 +181,6 @@ if not st.session_state['is_logged_in'] and cookie_user_id:
 if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
         st.markdown("<div style='text-align: center;'><h1 style='color: #ff6b6b;'>📝 新規会員登録</h1></div>", unsafe_allow_html=True)
-        # --- 画像追加 (登録画面) ---
-        img_friends = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
-        if img_friends:
-            col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-            with col_img2:
-                st.image(img_friends, caption="みんなで一緒に！", use_column_width=True)
-        # ------------------------
         with st.container(border=True):
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>新しくアカウントを作成してサンダーさんと一緒にダイエットを始めましょう！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -210,21 +203,7 @@ if not st.session_state['is_logged_in']:
                         st.session_state['show_register'] = False
                         st.rerun()
     else:
-        # --- タイトル変更 ---
-        st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からダイエット</h1></div>", unsafe_allow_html=True)
-        # -----------------
-        # --- 画像追加 (ログイン画面) ---
-        img_takagi_raian = "2026050923130200_s.jpg" if os.path.exists("2026050923130200_s.jpg") else None
-        img_takagi_single = "2026052915170600_s.jpg" if os.path.exists("2026052915170600_s.jpg") else None
-        if img_takagi_raian or img_takagi_single:
-            col_img_a, col_img_b, col_img_c = st.columns([1, 4, 1])
-            with col_img_b:
-                c1, c2 = st.columns(2)
-                if img_takagi_raian:
-                    c1.image(img_takagi_raian, caption="高木先生と…？", use_column_width=True)
-                if img_takagi_single:
-                    c2.image(img_takagi_single, caption="高木先生", use_column_width=True)
-        # ------------------------
+        st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からあなたもライエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>美食家サンダーさんとの美食ダイエット of 冒険へようこそ！</p>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -377,7 +356,7 @@ with st.chat_message("assistant", avatar=current_avatar):
         if dinner_cal > 500:
             st.write(f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！")
         elif dinner_cal > 0:
-            st.write(f"順順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！")
+            st.write(f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！")
         else:
             st.write(f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！")
     else:
