@@ -337,7 +337,8 @@ is_vision_mode = False
 # 🌟 盟友の神修正：チャット入力があったら確実に変数に繋ぐ！
 if chat_input_val:
     user_msg = chat_input_val
-
+if suggest_button:
+    user_msg = "現在の私の残りカロリー枠に合わせて、おすすめの夜ご飯を提案してください！"
 # 🌟 デバッグ用：ちゃんと繋がったかサイドバーで確認！
 with st.sidebar:
     st.write(f"🔍 Debug user_msg = {user_msg}")
@@ -471,11 +472,14 @@ if user_msg:
 bmr = (447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age)) if gender == "女子" else (88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age))
 target_cal = (bmr * activity) - ((weight - float(user_row['target_weight'])) * 7200 / 30)
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
     b_items = st.multiselect("朝食", df_menu['display'].tolist() if not df_menu.empty else [], key="b_items_sel")
 with col2:
     l_items = st.multiselect("昼食", df_menu['display'].tolist() if not df_menu.empty else [], key="l_items_sel")
+with col3:
+    # 🌟 夕食用の手動セレクトボックスを追加！
+    d_items = st.multiselect("夕食（AIの提案から選ぶ）", df_menu['display'].tolist() if not df_menu.empty else [], key="d_items_sel")
 
 if (b_items or l_items or 
     st.session_state['breakfast_food_name'] or 
@@ -506,15 +510,23 @@ if (b_items or l_items or
             st.markdown(f"<h3 style='text-align: center; color: #2196F3;'>🌙 夕食</h3>", unsafe_allow_html=True)
             if st.session_state['dinner_food_name']:
                 st.markdown(f"<div style='text-align: center; background-color: #cce5ff; padding: 5px; border-radius: 5px; font-weight: bold; color: #004085; margin-bottom: 8px;'>🤖 AI認識: {st.session_state['dinner_food_name']} ({st.session_state['selected_dinner_cal']}kcal)</div>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<p style='text-align: center; color: #999; font-size: 13px; font-style: italic;'>画像未解析</p>", unsafe_allow_html=True)
+            elif not d_items:
+                # 🌟 画像もセレクトボックスも空の時だけ「画像未解析」を出す
+                st.markdown(f"<p style='text-align: center; color: #999; font-size: 13px; font-style: italic;'>画像未解析 / メニュー未選択</p>", unsafe_allow_html=True)
+            
+            # 🌟 セレクトボックスで選んだ夕食をリスト表示する！
+            for item in d_items:
+                st.markdown(f"<p style='text-align: center; color: #666; font-size: 14px; font-weight: bold;'>✓ {item}</p>", unsafe_allow_html=True)
 
 csv_breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum() if not df_menu.empty else 0
 csv_lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum() if not df_menu.empty else 0
+# 🌟 夕食セレクトボックスのカロリー計算を追加
+csv_dinner_cal = df_menu[df_menu['display'].isin(d_items)]['cal'].sum() if not df_menu.empty else 0
 
 breakfast_cal = csv_breakfast_cal + st.session_state['vision_breakfast_cal']
 lunch_cal = csv_lunch_cal + st.session_state['vision_lunch_cal']
-dinner_selected_cal = st.session_state['selected_dinner_cal']
+# 🌟 画像のカロリーと、セレクトボックスのカロリーを合体！
+dinner_selected_cal = csv_dinner_cal + st.session_state['selected_dinner_cal']
 
 total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 # 🌟 残り枠計算の引き算修正
