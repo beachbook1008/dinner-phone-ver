@@ -349,17 +349,6 @@ if uploaded_file and meal_timing:
     except:
         pass
 
-if not user_msg:
-    if chat_input_val:
-        user_msg = chat_input_val
-    elif suggest_button:
-        try:
-            df_menu_raw = pd.read_csv(MENU_FILE) if os.path.exists(MENU_FILE) else pd.DataFrame()
-            menu_data = df_menu_raw.to_csv(index=False)
-            user_msg = f"今日の夜ご飯を提案して！以下の【dinner_list.csv】のデータを参考にして、おすすめのメニューとカロリー計算を教えて！\n\n【dinner_list.csv】\n{menu_data}"
-        except Exception as e:
-            user_msg = "今日の夜ご飯を提案して！おすすめのメニューとカロリー計算を教えて！"
-
 # --- 5. AI相談のリアルタイム処理（一本化・最新迎撃版） ---
 ai_printed_text = ""
 if user_msg:
@@ -458,7 +447,7 @@ if user_msg:
                     st.toast(f"🍳 AI画像認識成功: 「{food_name}」", icon="✨")
                     
         except Exception as e:
-            st.error(f"🔥 Vision例外発生: {type(e).__name__}")
+            st.error(f"🔥 Vision/Chat例外発生: {type(e).__name__}")
             st.error(f"🔥 例外内容: {e}")
 
             extracted_cal = 600
