@@ -334,6 +334,15 @@ chat_input_val = st.chat_input(chat_placeholder)
 user_msg = None
 is_vision_mode = False
 
+# 🌟 盟友の神修正：チャット入力があったら確実に変数に繋ぐ！
+if chat_input_val:
+    user_msg = chat_input_val
+
+# 🌟 デバッグ用：ちゃんと繋がったかサイドバーで確認！
+with st.sidebar:
+    st.write(f"🔍 Debug user_msg = {user_msg}")
+
+# もし画像もアップロードされていたら、画像用のプロンプトで上書きする
 if uploaded_file and meal_timing:
     try:
         file_bytes = uploaded_file.getvalue()
