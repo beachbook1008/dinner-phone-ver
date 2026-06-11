@@ -511,7 +511,17 @@ if user_msg := st.chat_input(chat_placeholder):
 
         # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
         # # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
-        sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
+        # get_system_promptが正常に変数を返さなかった場合のエラーを防ぐため、初期値を設定
+        try:
+            sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
+        except:
+            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
+
+        # 万が一、sys_promptがNoneや空で返ってきた場合のバックアップ
+        if not sys_prompt:
+            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
+
+        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         # AIに「過去の振り返りではなく、今夜の食事についての会話であること」を明示する指示を追加
 context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not yesterday. Please reply with advice or suggestions for tonight's dinner.]"
 
