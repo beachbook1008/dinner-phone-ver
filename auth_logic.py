@@ -17,9 +17,10 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 if api_key:
-    # 💡 最新の安定版URL（v1）を確実に指定
-    genai.configure(api_key=api_key, transport="rest", api_version="v1")
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    # 💡 古いライブラリでもエラーにならない安全な書き方に変更しました
+    genai.configure(api_key=api_key, transport="rest")
+    # 💡 モデル名に直接「v1」の通信を使うように指定します
+    model = genai.GenerativeModel(model_name='models/gemini-1.5-flash')
 else:
     st.error("APIキーがないよ！")
     st.stop()
