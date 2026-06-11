@@ -488,6 +488,10 @@ with chart_col2:
 
 # --- 8. AI相談室 ---
 # --- 8. AI相談室 ---
+# 💡 チャット履歴の初期化（これがないと会話が消えちゃいます）
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
 # 💡 選択肢の後ろに半角スペースが入っているため、in を使って部分一致で判定すると安全です
 if "高木先生" in ai_persona:
     chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
@@ -496,9 +500,34 @@ elif "フォーマル" in ai_persona:
 else:
     chat_placeholder = "雷さんに相談"
 
+# チャット履歴のクリアボタン（右側に配置）
+col_chat1, col_chat2 = st.columns([4, 1])
+with col_chat2:
+    if st.button("🗑️ 履歴クリア", use_container_width=True):
+        st.session_state.chat_history = []
+        st.rerun()
+
+# 💡 これまでのチャット履歴を画面に表示する
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"], avatar=msg["avatar"]):
+        st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
+
+# ユーザー入力とAIの回答処理
 if user_msg := st.chat_input(chat_placeholder):
+    
+    # 1. ユーザーの入力を履歴に追加して画面に表示
+    st.session_state.chat_history.append({
+        "role": "user",
+        "content": user_msg,
+        "class": "chat-bubble user-bubble",
+        "avatar": "👤"
+    })
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(f'<div class="chat-bubble user-bubble">{user_msg}</div>', unsafe_allow_html=True)
+
+    # 2. アシスタントの返答枠を準備
     with st.chat_message("assistant", avatar=current_avatar):
-        # 1. 各種変数の状況を、AIがパッと理解できる構造化テキストにする
+        # 現在のステータス情報
         current_status = f"""
 [User Status Context]
 - Target Weight: {user_row['target_weight']} kg
@@ -506,26 +535,22 @@ if user_msg := st.chat_input(chat_placeholder):
 - Activity Level Factor: {activity}
 - Remaining Calorie Budget for Dinner: {int(dinner_cal)} kcal
 - Total Calorie Intake Today: {int(total_cal)} kcal
-  * Breakfast: {int(breakfast_cal)} kcal (Selected: {', '.join(b_items) if b_items else 'None'})
-  * Lunch: {int(lunch_cal)} kcal (Selected: {', '.join(l_items) if l_items else 'None'})
-  * Tonight's Dinner (Selected or planned for tonight): {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
+  * Breakfast: {int(breakfast_cal)} kcal
+  * Lunch: {int(lunch_cal)} kcal
+  * Tonight's Dinner: {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
 """
-
-        # 2. システムプロンプトの取得（安全対策付き）
+        # システムプロンプトの取得
         try:
             sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
         except Exception:
-            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
-
+            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
+        
         if not sys_prompt:
-            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
+            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
 
-        # AIに「今夜の食事についての会話であること」を明示する指示を追加
-        context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not yesterday. Please reply with advice or suggestions for tonight's dinner.]"
-
+        context_reminder = "[Important Note: The dinner listed above is for TONIGHT. Please reply with advice or suggestions for tonight's dinner.]"
         prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
-        # 3. キャラクターごとにスピナーのメッセージを切り替える設定（インデントをifの中に修正）
         if "高木先生" in ai_persona:
             spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
         elif "雷さん" in ai_persona:
@@ -533,12 +558,11 @@ if user_msg := st.chat_input(chat_placeholder):
         else:
             spinner_msg = "AIが論理的なアドバイスを生成しています... "
 
-        # 4. スピナーとAI回答生成（すべての処理をif user_msgの中に正しく収める）
         with st.spinner(spinner_msg):
             try:
+                # AI生成
                 response = model.generate_content(prompt)
                 
-                # キャラクターに応じた吹き出しクラスを再度判定
                 if "高木先生" in ai_persona:
                     bubble_class = "chat-bubble takagi-bubble"
                 elif "雷さん" in ai_persona:
@@ -546,8 +570,15 @@ if user_msg := st.chat_input(chat_placeholder):
                 else:
                     bubble_class = "chat-bubble"
                 
-                # 💡 AIの返答を吹き出し風のHTMLでラッピングして表示
+                # AIの回答を履歴に保存して表示
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": response.text,
+                    "class": bubble_class,
+                    "avatar": current_avatar
+                })
+                
                 st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
                 
             except Exception as e:
-                st.error(f"AIエラー: {e}")
+                st.error(f"AI通信エラー: {e}")
