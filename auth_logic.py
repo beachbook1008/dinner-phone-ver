@@ -328,7 +328,47 @@ if b_items or l_items:
 
 dinner_cal = target_cal - (df_menu[df_menu['display'].isin(b_items)]['cal'].sum() + df_menu[df_menu['display'].isin(l_items)]['cal'].sum())
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
+# --- 修正・追加：夜ご飯の提案と選択ロジック ---
+st.markdown("---")
+st.subheader("🌙 夜ご飯の提案と選択")
 
+if not df_menu.empty:
+    # 1. 残り枠（dinner_cal）に収まるメニューをフィルタリング
+    suitable_dinner = df_menu[df_menu['cal'] <= dinner_cal]
+    
+    if not suitable_dinner.empty:
+        st.info(f"💡 今日の残り枠（{int(dinner_cal)} kcal）に収まるおすすめのメニューが {len(suitable_dinner)} 件見つかりました！")
+        display_options = suitable_dinner['display'].tolist()
+    else:
+        st.warning("⚠️ 残り枠に収まるメニューがありません。低カロリーなメニューを検討するか、全メニューから選択してください。")
+        display_options = df_menu['display'].tolist()
+        
+    # 2. ユーザーが夜ご飯を選択するセレクトボックス
+    selected_option = st.selectbox(
+        "今夜のメニューを決定する:",
+        ["未選択"] + display_options,
+        index=0 if st.session_state['selected_dinner'] is None else (display_options.index(st.session_state['selected_dinner']) + 1 if st.session_state['selected_dinner'] in display_options else 0)
+    )
+    
+    # 3. 選択された内容をセッション状態（状態管理）にしっかりと保存
+    if selected_option != "未選択":
+        matched_row = df_menu[df_menu['display'] == selected_option].iloc[0]
+        st.session_state['selected_dinner'] = matched_row['display']
+        st.session_state['selected_dinner_cal'] = float(matched_row['cal'])
+        
+        # 💡 style.pyの「.menu-card」のデザインを活かして、選択中のメニューをおしゃれに表示
+        st.markdown(f"""
+        <div class="menu-card">
+            <h4 style="margin:0; color:#ff6f00;">選択中の夜ご飯</h4>
+            <p style="margin:5px 0 0 0; font-weight:bold;">{matched_row['store']} - {matched_row['name']}</p>
+            <p style="margin:2px 0 0 0; color:#6b7280; font-size:14px;">{int(matched_row['cal'])} kcal ({matched_row['genre']})</p>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.session_state['selected_dinner'] = None
+        st.session_state['selected_dinner_cal'] = 0.0
+else:
+    st.error("メニューデータ（dinner_list.csv）が読み込めていないため、夜ご飯の提案ができません。")
 # --- 6. 自動挨拶（アバター切り替え対応版） ---
 # --- 6. 自動挨拶（アバター切り替え対応版） ---
 st.divider()
