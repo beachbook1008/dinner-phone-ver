@@ -8,24 +8,22 @@ from dotenv import load_dotenv
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
-# 💡 雷さんの単体画像
 rai_avatar = "mii_thunder.jpg" if os.path.exists("mii_thunder.jpg") else "⚡️"
-# 💡 集合写真とツーショット画像
 all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
 takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
-# --- 1. 初期設定 ---
 # --- 1. 初期設定 ---
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 if api_key:
-    # 最新の安定版URL（v1）を指定して、爆速の1.5-flashモデルを読み込みます
+    # 💡 最新の安定版URL（v1）を確実に指定
     genai.configure(api_key=api_key, transport="rest", api_version="v1")
     model = genai.GenerativeModel('models/gemini-1.5-flash')
 else:
     st.error("APIキーがないよ！")
     st.stop()
+
 import style
 import ai_config
 
@@ -170,7 +168,6 @@ if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
         st.markdown("<div style='text-align: center;'><h1 style='color: #ff6b6b;'>📝 新規会員登録</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            # 💡 新規登録画面の上部にも華やかに集合写真を配置
             if all_friends_img:
                 st.image(all_friends_img, use_container_width=True, caption="E班メンバー一同でサポートします！")
             st.markdown("<p style='text-align: center; color: #666; font-size: 14px;'>新しくアカウントを作成して一緒にダイエットを始めましょう！</p>", unsafe_allow_html=True)
@@ -196,7 +193,6 @@ if not st.session_state['is_logged_in']:
     else:
         st.markdown("<div style='text-align: center;'><h1 style='color: #2196F3;'>🔐 今日からダイエット</h1></div>", unsafe_allow_html=True)
         with st.container(border=True):
-            # 💡 【ご要望】ログイン画面のトップにみんなの写真（allfriends.jpg）を表示！
             if all_friends_img:
                 st.image(all_friends_img, use_container_width=True, caption="デジタル変革実験 E班プロジェクト")
                 
@@ -268,7 +264,6 @@ st.markdown("---")
 
 # --- サイドバーの設定 ---
 with st.sidebar:
-    # 💡 【ご要望】高木先生と雷さんのツーショット画像をサイドバー上部にマスコットとして組み込み！
     if takagi_rai_img:
         st.image(takagi_rai_img, use_container_width=True, caption="開発チーム: 高木先生 & 雷さん")
     else:
@@ -288,9 +283,10 @@ with st.sidebar:
     
     st.markdown("---")
     st.header(" 発表用AI設定")
+    # 💡 判定をブレさせないため、末尾の余計な半角スペースを完全に削除しました！
     ai_persona = st.selectbox(
         "AIのキャラクター",
-        ["雷さん ", "高木先生モード", "フォーマル "]
+        ["雷さん", "高木先生モード", "フォーマル"]
     )
     
     if st.button("ログアウト"):
@@ -330,14 +326,12 @@ if b_items or l_items:
 
 dinner_cal = target_cal - (df_menu[df_menu['display'].isin(b_items)]['cal'].sum() + df_menu[df_menu['display'].isin(l_items)]['cal'].sum())
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
-# --- 修正・追加：夜ご飯の提案と選択ロジック ---
+
 st.markdown("---")
 st.subheader("🌙 夜ご飯の提案と選択")
 
 if not df_menu.empty:
-    # 1. 残り枠（dinner_cal）に収まるメニューをフィルタリング
     suitable_dinner = df_menu[df_menu['cal'] <= dinner_cal]
-    
     if not suitable_dinner.empty:
         st.info(f"💡 今日の残り枠（{int(dinner_cal)} kcal）に収まるおすすめのメニューが {len(suitable_dinner)} 件見つかりました！")
         display_options = suitable_dinner['display'].tolist()
@@ -345,20 +339,17 @@ if not df_menu.empty:
         st.warning("⚠️ 残り枠に収まるメニューがありません。低カロリーなメニューを検討するか、全メニューから選択してください。")
         display_options = df_menu['display'].tolist()
         
-    # 2. ユーザーが夜ご飯を選択するセレクトボックス
     selected_option = st.selectbox(
         "今夜のメニューを決定する:",
         ["未選択"] + display_options,
         index=0 if st.session_state['selected_dinner'] is None else (display_options.index(st.session_state['selected_dinner']) + 1 if st.session_state['selected_dinner'] in display_options else 0)
     )
     
-    # 3. 選択された内容をセッション状態（状態管理）にしっかりと保存
     if selected_option != "未選択":
         matched_row = df_menu[df_menu['display'] == selected_option].iloc[0]
         st.session_state['selected_dinner'] = matched_row['display']
         st.session_state['selected_dinner_cal'] = float(matched_row['cal'])
         
-        # 💡 style.pyの「.menu-card」のデザインを活かして、選択中のメニューをおしゃれに表示
         st.markdown(f"""
         <div class="menu-card">
             <h4 style="margin:0; color:#ff6f00;">選択中の夜ご飯</h4>
@@ -371,15 +362,14 @@ if not df_menu.empty:
         st.session_state['selected_dinner_cal'] = 0.0
 else:
     st.error("メニューデータ（dinner_list.csv）が読み込めていないため、夜ご飯の提案ができません。")
-# --- 6. 自動挨拶（アバター切り替え対応版） ---
+
 # --- 6. 自動挨拶（アバター切り替え対応版） ---
 st.divider()
 
-# 💡 キャラクターの選択状態に応じてアバターと吹き出しの色を決定！
-if ai_persona == "高木先生モード":
+if "高木先生" in ai_persona:
     current_avatar = takagi_avatar
     bubble_class = "chat-bubble takagi-bubble"
-elif ai_persona == "雷さん ":
+elif "雷さん" in ai_persona:
     current_avatar = rai_avatar
     bubble_class = "chat-bubble rai-bubble"
 else:
@@ -387,7 +377,7 @@ else:
     bubble_class = "chat-bubble"
 
 with st.chat_message("assistant", avatar=current_avatar):
-    if ai_persona == "高木先生モード":
+    if "高木先生" in ai_persona:
         if dinner_cal > 500:
             msg = f"Hello {user_id}さん！今日の残り枠は {int(dinner_cal)}kcal もありますね. This is perfect！素晴らしい投資効率（ROI）ですよ. 夜は美味しいものを楽しんでくださいね！"
         elif dinner_cal > 0:
@@ -402,8 +392,8 @@ with st.chat_message("assistant", avatar=current_avatar):
         else:
             msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
             
-    # 💡 st.write の代わりに吹き出し用のHTMLで文字を囲む！
     st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
+
 # --- 7.5 朝昼夕の合計摂取カロリー表示 ---
 breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum()
 lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum()
@@ -413,7 +403,6 @@ total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 st.markdown("---")
 st.subheader("📊 本日の栄養摂取状況とバランス")
 
-# 💡 左右に分割して、左に数字、右に円グラフを並べる！
 chart_col1, chart_col2 = st.columns([1, 1])
 
 with chart_col1:
@@ -427,14 +416,11 @@ with chart_col1:
             st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
 
 with chart_col2:
-    # 💡 グラフ用のデータを準備（残り枠がマイナスの時は0にする）
     left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
-    
     raw_labels = ['朝食', '昼食', '夕食', '残り枠']
     raw_sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
     raw_colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
     
-    # 💡 【文字の重なり解消！】0のデータはグラフの部品から完全に除外する
     labels = []
     sizes = []
     colors = []
@@ -444,19 +430,15 @@ with chart_col2:
             sizes.append(s)
             colors.append(c)
             
-    # 何も入力されていない（または全部0）の時は、スッキリした1つのグレー円にする
     if len(sizes) == 0:
         sizes = [100]
         labels = ['1日の目標枠']
         colors = ['#e0e0e0']
     
-    # 💡 【真・文字化け対策】ちゃんと「日本語」が入っている美しいフォントを直接適用する！
     import matplotlib.pyplot as plt
     import matplotlib.font_manager as fm
     import urllib.request
-    import os
 
-    # 1. 日本語対応のフォント（BIZ UDゴシック）をダウンロード
     font_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
     font_path = "BIZUDGothic-Regular.ttf"
     if not os.path.exists(font_path):
@@ -465,13 +447,11 @@ with chart_col2:
         except:
             pass
             
-    # 2. フォントのデータを準備
     if os.path.exists(font_path):
         fp = fm.FontProperties(fname=font_path)
     else:
         fp = fm.FontProperties(family='sans-serif')
     
-    # 3. グラフを描画（textpropsで直接日本語フォントを指定！）
     fig, ax = plt.subplots(figsize=(4, 4))
     wedges, texts, autotexts = ax.pie(
         sizes, 
@@ -480,21 +460,16 @@ with chart_col2:
         startangle=90, 
         colors=colors,
         textprops={'color': "black", 'size': 9, 'fontproperties': fp}, 
-        wedgeprops=dict(width=0.4, edgecolor='white') # ドーナツの幅
+        wedgeprops=dict(width=0.4, edgecolor='white')
     )
     plt.setp(autotexts, size=8, weight="bold", fontproperties=fp)
     ax.axis('equal')  
-    
-    # Streamlitの画面にグラフを表示！
     st.pyplot(fig)
 
 # --- 8. AI相談室 ---
-# --- 8. AI相談室 ---
-# 💡 チャット履歴の初期化（これがないと会話が消えちゃいます）
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
-# 💡 選択肢の後ろに半角スペースが入っているため、in を使って部分一致で判定すると安全です
 if "高木先生" in ai_persona:
     chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
 elif "フォーマル" in ai_persona:
@@ -502,22 +477,17 @@ elif "フォーマル" in ai_persona:
 else:
     chat_placeholder = "雷さんに相談"
 
-# チャット履歴のクリアボタン（右側に配置）
 col_chat1, col_chat2 = st.columns([4, 1])
 with col_chat2:
     if st.button("🗑️ 履歴クリア", use_container_width=True):
         st.session_state.chat_history = []
         st.rerun()
 
-# 💡 これまでのチャット履歴を画面に表示する
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"], avatar=msg["avatar"]):
         st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
 
-# ユーザー入力とAIの回答処理
 if user_msg := st.chat_input(chat_placeholder):
-    
-    # 1. ユーザーの入力を履歴に追加して画面に表示
     st.session_state.chat_history.append({
         "role": "user",
         "content": user_msg,
@@ -527,9 +497,7 @@ if user_msg := st.chat_input(chat_placeholder):
     with st.chat_message("user", avatar="👤"):
         st.markdown(f'<div class="chat-bubble user-bubble">{user_msg}</div>', unsafe_allow_html=True)
 
-    # 2. アシスタントの返答枠を準備
     with st.chat_message("assistant", avatar=current_avatar):
-        # 現在のステータス情報
         current_status = f"""
 [User Status Context]
 - Target Weight: {user_row['target_weight']} kg
@@ -541,7 +509,6 @@ if user_msg := st.chat_input(chat_placeholder):
   * Lunch: {int(lunch_cal)} kcal
   * Tonight's Dinner: {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
 """
-        # システムプロンプトの取得
         try:
             sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
         except Exception:
@@ -550,7 +517,7 @@ if user_msg := st.chat_input(chat_placeholder):
         if not sys_prompt:
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
 
-        context_reminder = "[Important Note: The dinner listed above is for TONIGHT. Please reply with advice or suggestions for tonight's dinner.]"
+        context_reminder = "[Important Note: The dinner listed above is for TONIGHT. Please reply with advice or suggestions for tonight's dinner. Keep your response short and sweet!]"
         prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
         if "高木先生" in ai_persona:
@@ -562,7 +529,6 @@ if user_msg := st.chat_input(chat_placeholder):
 
         with st.spinner(spinner_msg):
             try:
-                # AI生成
                 response = model.generate_content(prompt)
                 
                 if "高木先生" in ai_persona:
@@ -572,7 +538,6 @@ if user_msg := st.chat_input(chat_placeholder):
                 else:
                     bubble_class = "chat-bubble"
                 
-                # AIの回答を履歴に保存して表示
                 st.session_state.chat_history.append({
                     "role": "assistant",
                     "content": response.text,
@@ -581,6 +546,7 @@ if user_msg := st.chat_input(chat_placeholder):
                 })
                 
                 st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
+                st.rerun() # 💡 画面を綺麗に同期してチャット枠を維持
                 
             except Exception as e:
                 st.error(f"AI通信エラー: {e}")
