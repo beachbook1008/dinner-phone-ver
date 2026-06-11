@@ -20,7 +20,11 @@ api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
     # 16行目をこれに書き換えて保存してみてください！
-    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
+    if api_key:
+    # 💡 api_version="v1" を絶対にここに追加します！これで古い通信URLを完全に防ぎます。
+    genai.configure(api_key=api_key, transport="rest", api_version="v1")
+    model = genai.GenerativeModel('models/gemini-1.5-flash')
+else:
 else:
     st.error("APIキーがないよ！")
     st.stop()
