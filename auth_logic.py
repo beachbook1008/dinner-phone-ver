@@ -518,15 +518,16 @@ context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not
 prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
         # 💡 キャラクターごとにスピナーのメッセージを切り替える設定
-        if ai_persona == "高木先生モード":
+        
+if ai_persona == "高木先生モード":
             spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
-        elif ai_persona == "雷さん ":
+elif ai_persona == "雷さん ":
             spinner_msg = "雷さんが美味しいお店を爆速検索中"
-        else:
+else:
             spinner_msg = "AIが論理的なアドバイスを生成しています... "
 
         # 💡 try-except の外側を with st.spinner() で囲む
-        with st.spinner(spinner_msg):
+with st.spinner(spinner_msg):
             try:
                 response = model.generate_content(prompt)
                 
