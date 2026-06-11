@@ -19,7 +19,8 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
-    model = genai.GenerativeModel('models/gemini-1.5-flash')
+    # 16行目をこれに書き換えて保存してみてください！
+    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 else:
     st.error("APIキーがないよ！")
     st.stop()
