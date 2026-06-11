@@ -15,20 +15,17 @@ all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
 takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
 # --- 1. 初期設定 ---
+# --- 1. 初期設定 ---
 load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
+
 if api_key:
-    genai.configure(api_key=api_key, transport="rest")
-    # 16行目をこれに書き換えて保存してみてください！
-    if api_key:
-    # 💡 api_version="v1" を絶対にここに追加します！これで古い通信URLを完全に防ぎます。
+    # 最新の安定版URL（v1）を指定して、爆速の1.5-flashモデルを読み込みます
     genai.configure(api_key=api_key, transport="rest", api_version="v1")
     model = genai.GenerativeModel('models/gemini-1.5-flash')
 else:
-else:
     st.error("APIキーがないよ！")
     st.stop()
-
 import style
 import ai_config
 
