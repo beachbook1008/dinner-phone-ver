@@ -506,13 +506,16 @@ if user_msg := st.chat_input(chat_placeholder):
 - Total Calorie Intake Today: {int(total_cal)} kcal
   * Breakfast: {int(breakfast_cal)} kcal (Selected: {', '.join(b_items) if b_items else 'None'})
   * Lunch: {int(lunch_cal)} kcal (Selected: {', '.join(l_items) if l_items else 'None'})
-  * Dinner (Selected from recommendation): {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
+  * Tonight's Dinner (Selected or planned for tonight): {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
 """
 
         # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
         # # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
         sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
-        prompt = f"{sys_prompt}\n\n{current_status}\n\nUser Question: {user_msg}"
+        # AIに「過去の振り返りではなく、今夜の食事についての会話であること」を明示する指示を追加
+context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not yesterday. Please reply with advice or suggestions for tonight's dinner.]"
+
+prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
         # 💡 キャラクターごとにスピナーのメッセージを切り替える設定
         if ai_persona == "高木先生モード":
