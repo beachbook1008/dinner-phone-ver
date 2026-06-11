@@ -487,9 +487,11 @@ with chart_col2:
     st.pyplot(fig)
 
 # --- 8. AI相談室 ---
-if ai_persona == "高木先生モード":
-    chat_placeholder = "高木先生にWeb3やライエットの相談をする"
-elif ai_persona == "フォーマル":
+# --- 8. AI相談室 ---
+# 💡 選択肢の後ろに半角スペースが入っているため、in を使って部分一致で判定すると安全です
+if "高木先生" in ai_persona:
+    chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
+elif "フォーマル" in ai_persona:
     chat_placeholder = "AIアシスタントに論理的な相談をする"
 else:
     chat_placeholder = "雷さんに相談"
@@ -509,42 +511,37 @@ if user_msg := st.chat_input(chat_placeholder):
   * Tonight's Dinner (Selected or planned for tonight): {st.session_state['selected_dinner'] or 'Not selected yet'} ({dinner_selected_cal} kcal)
 """
 
-        # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
-        # # 2. システムプロンプト、現在のステータス、ユーザーの質問を綺麗に結合
-        # get_system_promptが正常に変数を返さなかった場合のエラーを防ぐため、初期値を設定
+        # 2. システムプロンプトの取得（安全対策付き）
         try:
             sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
-        except:
+        except Exception:
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
 
-        # 万が一、sys_promptがNoneや空で返ってきた場合のバックアップ
         if not sys_prompt:
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。フォーマルな口調で適切な食事のアドバイスをしてください。"
 
-        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
-        # AIに「過去の振り返りではなく、今夜の食事についての会話であること」を明示する指示を追加
-context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not yesterday. Please reply with advice or suggestions for tonight's dinner.]"
+        # AIに「今夜の食事についての会話であること」を明示する指示を追加
+        context_reminder = "[Important Note: The dinner listed above is for TONIGHT, not yesterday. Please reply with advice or suggestions for tonight's dinner.]"
 
-prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
+        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
-        # 💡 キャラクターごとにスピナーのメッセージを切り替える設定
-        
-if ai_persona == "高木先生モード":
+        # 3. キャラクターごとにスピナーのメッセージを切り替える設定（インデントをifの中に修正）
+        if "高木先生" in ai_persona:
             spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
-elif ai_persona == "雷さん ":
+        elif "雷さん" in ai_persona:
             spinner_msg = "雷さんが美味しいお店を爆速検索中"
-else:
+        else:
             spinner_msg = "AIが論理的なアドバイスを生成しています... "
 
-        # 💡 try-except の外側を with st.spinner() で囲む
-with st.spinner(spinner_msg):
+        # 4. スピナーとAI回答生成（すべての処理をif user_msgの中に正しく収める）
+        with st.spinner(spinner_msg):
             try:
                 response = model.generate_content(prompt)
                 
                 # キャラクターに応じた吹き出しクラスを再度判定
-                if ai_persona == "高木先生モード":
+                if "高木先生" in ai_persona:
                     bubble_class = "chat-bubble takagi-bubble"
-                elif ai_persona == "雷さん ":
+                elif "雷さん" in ai_persona:
                     bubble_class = "chat-bubble rai-bubble"
                 else:
                     bubble_class = "chat-bubble"
@@ -554,9 +551,3 @@ with st.spinner(spinner_msg):
                 
             except Exception as e:
                 st.error(f"AIエラー: {e}")
-
-# --- サイドバーの最下部にBGMを配置 ---
-with st.sidebar:
-    st.markdown("---")
-    st.write("🎵 BGM")
-    st.video("https://youtu.be/l7Tr8xb_tFk", format="video/mp4", start_time=0)
