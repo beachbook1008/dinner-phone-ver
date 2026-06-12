@@ -285,7 +285,7 @@ with st.sidebar:
     
     st.markdown("---")
     st.header(" 発表用AI設定")
-    # 💡 判定をブレさせないため、末尾の余計な半角スペースを完全に削除しました！
+    # 判定をブレさせないため、末尾の余計な半角スペースを完全に削除
     ai_persona = st.selectbox(
         "AIのキャラクター",
         ["雷さん", "高木先生モード", "フォーマル"]
@@ -481,7 +481,7 @@ else:
 
 col_chat1, col_chat2 = st.columns([4, 1])
 with col_chat2:
-    if st.button("🗑️ 履歴クリア", use_container_width=True):
+    if st.button("履歴クリア", use_container_width=True):
         st.session_state.chat_history = []
         st.rerun()
 
