@@ -1,4 +1,5 @@
 import time
+import hashlib
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -32,9 +33,16 @@ import ai_config
 st.set_page_config(page_title="Dinner Logic DX", layout="wide")
 style.apply_custom_css()
 
+
+
 # --- 2. データ管理関数 ---
 USER_FILE = "user_settings.csv"
 MENU_FILE = "dinner_list.csv"
+
+def hash_password(password):
+    if not password:
+        return ""
+    return hashlib.sha256(str(password).encode('utf-8')).hexdigest()
 
 def get_all_users():
     cols = ["user_id", "password", "target_weight", "last_update", "consecutive_days"]
@@ -57,19 +65,24 @@ def get_all_users():
             return pd.DataFrame(columns=cols)
     return pd.DataFrame(columns=cols)
 
-def save_user(user_id, password, target_weight=None, consecutive_days=None):
+def save_user(user_id, password, target_weight=None, consecutive_days=None, is_password_hashed=False):
     df = get_all_users()
     u_str = str(user_id)
+    stored_password = password
+    if password and not is_password_hashed:
+        stored_password = hash_password(password)
+        
     if u_str in df['user_id'].astype(str).values:
         idx = df[df['user_id'].astype(str) == u_str].index[0]
-        if password: df.at[idx, 'password'] = password
+        if password:
+            df.at[idx, 'password'] = stored_password
         if target_weight is not None:
             df.at[idx, 'target_weight'] = target_weight
             df.at[idx, 'last_update'] = datetime.now().strftime("%Y-%m-%d")
         if consecutive_days is not None:
             df.at[idx, 'consecutive_days'] = consecutive_days
     else:
-        new_row = pd.DataFrame({"user_id": [user_id], "password": [password], "target_weight": [target_weight], "last_update": [datetime.now().strftime("%Y-%m-%d")], "consecutive_days": [consecutive_days or 1]})
+        new_row = pd.DataFrame({"user_id": [user_id], "password": [stored_password], "target_weight": [target_weight], "last_update": [datetime.now().strftime("%Y-%m-%d")], "consecutive_days": [consecutive_days or 1]})
         df = pd.concat([df, new_row], ignore_index=True)
         
     df.to_csv(USER_FILE, index=False)
@@ -150,21 +163,20 @@ if 'selected_dinner_cal' not in st.session_state:
 cookie_user_id = st.context.cookies.get("saved_user_id")
 
 if not st.session_state['is_logged_in'] and cookie_user_id:
-    df = get_all_users()
-    match = df[df['user_id'].astype(str) == str(cookie_user_id)]
-    if not match.empty:
-        user_info = match.iloc[0]
-        reset_basic_info_on_month_start(cookie_user_id)
-        consecutive_days = calculate_consecutive_days(cookie_user_id)
-        save_user(cookie_user_id, user_info['password'], user_info['target_weight'], consecutive_days)
-        st.session_state['height'] = float(user_info.get('height', 160.0))
-        st.session_state['weight'] = float(user_info.get('weight', 55.0))
-        st.session_state['age'] = int(user_info.get('age', 20))
-        st.session_state['gender'] = user_info.get('gender', "女子")
-        st.session_state['is_logged_in'] = True
-        st.session_state['current_user'] = cookie_user_id
-        st.rerun()
-
+        df = get_all_users()
+        match = df[df['user_id'].astype(str) == str(cookie_user_id)]
+        if not match.empty:
+            user_info = match.iloc[0]
+            reset_basic_info_on_month_start(cookie_user_id)
+            consecutive_days = calculate_consecutive_days(cookie_user_id)
+            save_user(cookie_user_id, user_info['password'], user_info['target_weight'], consecutive_days, is_password_hashed=True)
+            st.session_state['height'] = float(user_info.get('height', 160.0))
+            st.session_state['weight'] = float(user_info.get('weight', 55.0))
+            st.session_state['age'] = int(user_info.get('age', 20))
+            st.session_state['gender'] = user_info.get('gender', "女子")
+            st.session_state['is_logged_in'] = True
+            st.session_state['current_user'] = cookie_user_id
+            st.rerun()
 # A. ログイン・登録画面
 if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
@@ -206,12 +218,13 @@ if not st.session_state['is_logged_in']:
                 st.markdown("")
                 if st.button("🔓 ログイン", use_container_width=True):
                     df = get_all_users()
-                    match = df[(df['user_id'].astype(str) == l_id) & (df['password'].astype(str) == l_pw)]
+                    hashed_input_pw = hash_password(l_pw)
+                    match = df[(df['user_id'].astype(str) == l_id) & (df['password'].astype(str) == hashed_input_pw)]
                     if not match.empty:
                         user_info = match.iloc[0]
                         reset_basic_info_on_month_start(l_id)
                         consecutive_days = calculate_consecutive_days(l_id)
-                        save_user(l_id, user_info['password'], user_info['target_weight'], consecutive_days)
+                        save_user(l_id, user_info['password'], user_info['target_weight'], consecutive_days, is_password_hashed=True)
                         st.session_state['height'] = float(user_info.get('height', 160.0))
                         st.session_state['weight'] = float(user_info.get('weight', 55.0))
                         st.session_state['age'] = int(user_info.get('age', 20))
@@ -248,7 +261,7 @@ if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
     st.title(f"📅 目標設定 ({user_id})")
     t_w = st.number_input("今月の目標体重 (kg)", 30.0, 150.0, 52.0)
     if st.button("目標を保存"):
-        save_user(user_id, user_row['password'], t_w)
+        save_user(user_id, user_row['password'], t_w, is_password_hashed=True)
         st.rerun()
     st.stop()
 
