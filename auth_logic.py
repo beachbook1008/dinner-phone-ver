@@ -20,7 +20,8 @@ if api_key:
     # 💡 古いライブラリでもエラーにならない安全な書き方に変更しました
     genai.configure(api_key=api_key, transport="rest")
     # 💡 モデル名に直接「v1」の通信を使うように指定します
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    # 💡 モデル名に直接「v1」の通信を使うように指定します
+    model = genai.GenerativeModel("gemini-1.5-flash")
 else:
     st.error("APIキーがないよ！")
     st.stop()
