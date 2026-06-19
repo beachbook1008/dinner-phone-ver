@@ -14,19 +14,28 @@ all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
 takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
 # --- 1. 初期設定 ---
+# --- 1. 初期設定 ---
 load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+
+# 💡 Secrets(Streamlit Cloud)を最優先に、なければ環境変数を読み込む
+api_key = st.secrets.get(
+    "GEMINI_API_KEY",
+    os.getenv("GEMINI_API_KEY")
+)
+
+# 🔍 【デバッグ用】APIキーの冒頭12文字を画面に表示して確認
+if api_key:
+    st.write(f"🔧 現在読み込んでいるキーの冒頭: `{api_key[:12]}`")
+else:
+    st.write("🚨 キーが完全に空っぽです")
 
 if api_key:
     # 💡 古いライブラリでもエラーにならない安全な書き方に変更しました
     genai.configure(api_key=api_key, transport="rest")
-    # 💡 モデル名に直接「v1」の通信を使うように指定します
-    # 💡 モデル名に直接「v1」の通信を使うように指定します
     model = genai.GenerativeModel("gemini-2.0-flash")
 else:
     st.error("APIキーがないよ！")
     st.stop()
-
 import style
 import ai_config
 
