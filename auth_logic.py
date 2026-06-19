@@ -488,37 +488,23 @@ with chart_col2:
     ax.axis('equal')  
     st.pyplot(fig)
 
-# --- 8. AI相談室 ---
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "高木先生" in ai_persona:
-    chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
-elif "フォーマル" in ai_persona:
-    chat_placeholder = "AIアシスタントに論理的な相談をする"
-else:
-    chat_placeholder = "雷さんに相談"
-
-col_chat1, col_chat2 = st.columns([4, 1])
-with col_chat2:
-    if st.button("履歴クリア", use_container_width=True):
-        st.session_state.chat_history = []
-        st.rerun()
-
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"], avatar=msg["avatar"]):
-        st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
-
 if user_msg := st.chat_input(chat_placeholder):
+    # 1. ユーザーの入力を履歴に追加
     st.session_state.chat_history.append({
         "role": "user",
         "content": user_msg,
         "class": "chat-bubble user-bubble",
         "avatar": "👤"
     })
-    with st.chat_message("user", avatar="👤"):
-        st.markdown(f'<div class="chat-bubble user-bubble">{user_msg}</div>', unsafe_allow_html=True)
+    
+    # 💡 内部的な処理（API通信など）を行う前に、一度画面をリライトして
+    # ユーザーのメッセージを即座にチャット画面に表示・同期させます
+    st.rerun()
 
+# ユーザーが直前に入力し、まだAIの返答がない場合の処理
+if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
+    latest_user_msg = st.session_state.chat_history[-1]["content"]
+    
     with st.chat_message("assistant", avatar=current_avatar):
         current_status = f"""
 [User Status Context]
@@ -540,7 +526,7 @@ if user_msg := st.chat_input(chat_placeholder):
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
 
         context_reminder = "[Important Note: The dinner listed above is for TONIGHT. Please reply with advice or suggestions for tonight's dinner. Keep your response short and sweet!]"
-        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
+        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {latest_user_msg}"
         
         if "高木先生" in ai_persona:
             spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
@@ -560,6 +546,7 @@ if user_msg := st.chat_input(chat_placeholder):
                 else:
                     bubble_class = "chat-bubble"
                 
+                # 2. AIの応答を履歴に追加
                 st.session_state.chat_history.append({
                     "role": "assistant",
                     "content": response.text,
@@ -567,8 +554,9 @@ if user_msg := st.chat_input(chat_placeholder):
                     "avatar": current_avatar
                 })
                 
-                st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
-                st.rerun() # 💡 画面を綺麗に同期してチャット枠を維持
+                # 💡 履歴に追加したため、再度 rerun することで
+                # 上記の履歴描画ループ（for msg in st.session_state.chat_history）によって綺麗に再描画されます
+                st.rerun()
                 
             except Exception as e:
                 st.error(f"AI通信エラー: {e}")
