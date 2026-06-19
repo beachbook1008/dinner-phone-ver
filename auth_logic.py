@@ -21,8 +21,8 @@ api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
-    # 💡 安定して動く1.5 Flashに変更（クォータ制限回避のため）
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    
+    model = genai.GenerativeModel("gemini-2.0-flash")
 else:
     st.error("APIキーがないよ！")
     st.stop()
