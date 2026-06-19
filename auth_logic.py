@@ -95,9 +95,16 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None, is_p
         try:
             import requests
             import json
-            clean_df = df.fillna("")
+            # 元の df を汚さないよう、コピーを作ってから空文字埋めを行う
+            clean_df = df.copy()
+            clean_df = clean_df.replace({pd.NA: "", None: ""}).fillna("")
+            
             json_data = json.dumps(clean_df.to_dict(orient="records"))
             res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
+
+            
+            
+            # ...（以下省略）res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
             if res.status_code == 200:
                 st.success(f"⭕ Googleへの送信自体は成功しました！Googleからの返事: {res.text}")
             else:
