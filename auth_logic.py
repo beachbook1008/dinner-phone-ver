@@ -14,35 +14,24 @@ all_friends_img = "allfriends.jpg" if os.path.exists("allfriends.jpg") else None
 takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 
 # --- 1. 初期設定 ---
-# --- 1. 初期設定 ---
 load_dotenv()
 
-# 💡 Secrets(Streamlit Cloud)を最優先に、なければ環境変数を読み込む
-api_key = st.secrets.get(
-    "GEMINI_API_KEY",
-    os.getenv("GEMINI_API_KEY")
-)
-
-# 🔍 【デバッグ用】APIキーの冒頭12文字を画面に表示して確認
-if api_key:
-    st.write(f"🔧 現在読み込んでいるキーの冒頭: `{api_key[:12]}`")
-else:
-    st.write("🚨 キーが完全に空っぽです")
+# 💡 Secretsを最優先に読み込む
+api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 
 if api_key:
-    # 💡 古いライブラリでもエラーにならない安全な書き方に変更しました
     genai.configure(api_key=api_key, transport="rest")
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    # 💡 安定して動く1.5 Flashに変更（クォータ制限回避のため）
+    model = genai.GenerativeModel("gemini-1.5-flash")
 else:
     st.error("APIキーがないよ！")
     st.stop()
+
 import style
 import ai_config
 
 st.set_page_config(page_title="Dinner Logic DX", layout="wide")
 style.apply_custom_css()
-
-
 
 # --- 2. データ管理関数 ---
 USER_FILE = "user_settings.csv"
@@ -97,29 +86,19 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None, is_p
     df.to_csv(USER_FILE, index=False)
     
     if "db_backup_url" not in st.secrets:
-        st.error("🚨 エラー理由：StreamlitのSecretsに『db_backup_url』という名前が登録されていません！")
-    elif not st.secrets["db_backup_url"]:
-        st.error("🚨 エラー理由：Secretsの『db_backup_url = \"\"』の中身が空っぽになっています！")
-    else:
+        pass 
+    elif st.secrets["db_backup_url"]:
         try:
             import requests
             import json
-            # 元の df を汚さないよう、コピーを作ってから空文字埋めを行う
+            # 💡 空文字やNaNでデータが壊れるのを防ぐコピー処理
             clean_df = df.copy()
             clean_df = clean_df.replace({pd.NA: "", None: ""}).fillna("")
             
             json_data = json.dumps(clean_df.to_dict(orient="records"))
-            res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
-
-            
-            
-            # ...（以下省略）res = requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
-            if res.status_code == 200:
-                st.success(f"⭕ Googleへの送信自体は成功しました！Googleからの返事: {res.text}")
-            else:
-                st.error(f"❌ Google側で拒否されました。エラーコード: {res.status_code} / 返事: {res.text}")
-        except Exception as e:
-            st.error(f"💥 通信エラーが起きました。エラー内容: {e}")
+            requests.post(st.secrets["db_backup_url"], data=json_data, headers={"Content-Type": "application/json"}, timeout=10)
+        except Exception:
+            pass
 
 def reset_basic_info_on_month_start(user_id):
     if datetime.now().day != 1:
@@ -141,7 +120,8 @@ def calculate_consecutive_days(user_id):
     idx = df[df['user_id'].astype(str) == u_str].index[0]
     last_update_str = df.at[idx, 'last_update']
     current_consecutive = df.at[idx, 'consecutive_days']
-    if pd.isna(last_update_str) or pd.isna(current_consecutive):
+    
+    if pd.isna(last_update_str) or str(last_update_str).strip() == "" or pd.isna(current_consecutive):
         return 1
     try:
         last_update = datetime.strptime(last_update_str, "%Y-%m-%d").date()
@@ -193,6 +173,7 @@ if not st.session_state['is_logged_in'] and cookie_user_id:
             st.session_state['is_logged_in'] = True
             st.session_state['current_user'] = cookie_user_id
             st.rerun()
+
 # A. ログイン・登録画面
 if not st.session_state['is_logged_in']:
     if st.session_state['show_register']:
@@ -314,7 +295,6 @@ with st.sidebar:
     
     st.markdown("---")
     st.header(" 発表用AI設定")
-    # 判定をブレさせないため、末尾の余計な半角スペースを完全に削除
     ai_persona = st.selectbox(
         "AIのキャラクター",
         ["雷さん", "高木先生モード", "フォーマル"]
@@ -514,25 +494,25 @@ with col_chat2:
         st.session_state.chat_history = []
         st.rerun()
 
-# 過去のチャット履歴を画面に描画
+# 1. 過去の履歴をまず描画する
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"], avatar=msg["avatar"]):
         st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
 
-# ユーザーの新規入力判定
+# 2. 新しい入力があった時の処理（★ここに st.rerun() は絶対に入れない）
 if user_msg := st.chat_input(chat_placeholder):
+    # ユーザーのセリフをその場で描画＆履歴に追加
+    with st.chat_message("user", avatar="👤"):
+        st.markdown(f'<div class="chat-bubble user-bubble">{user_msg}</div>', unsafe_allow_html=True)
+    
     st.session_state.chat_history.append({
         "role": "user",
         "content": user_msg,
         "class": "chat-bubble user-bubble",
         "avatar": "👤"
     })
-    st.rerun()
 
-# 状態駆動：直前の入力がユーザーのものであればAIが応答を生成
-if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
-    latest_user_msg = st.session_state.chat_history[-1]["content"]
-    
+    # その流れのまま、待たせることなくAPIを「1回だけ」叩く
     with st.chat_message("assistant", avatar=current_avatar):
         current_status = f"""
 [User Status Context]
@@ -549,23 +529,16 @@ if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] =
             sys_prompt = ai_config.get_system_prompt(ai_persona, user_id)
         except Exception:
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
-        
-        if not sys_prompt:
-            sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
 
-        context_reminder = "[Important Note: The dinner listed above is for TONIGHT. Please reply with advice or suggestions for tonight's dinner. Keep your response short and sweet!]"
-        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {latest_user_msg}"
+        context_reminder = "[Important Note: Please keep your response short and sweet!]"
+        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
         
-        if "高木先生" in ai_persona:
-            spinner_msg = "AIプロンプトをメタバースに送信中... 10 seconds ほどお待ちください... 🌐"
-        elif "雷さん" in ai_persona:
-            spinner_msg = "雷さんが美味しいお店を爆速検索中"
-        else:
-            spinner_msg = "AIが論理的なアドバイスを生成しています... "
-
-        with st.spinner(spinner_msg):
+        with st.spinner("AIが回答を生成中..."):
             try:
                 response = model.generate_content(prompt)
+                
+                # 回答をその場で描画＆履歴に追加
+                st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
                 
                 st.session_state.chat_history.append({
                     "role": "assistant",
@@ -573,7 +546,7 @@ if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] =
                     "class": bubble_class,
                     "avatar": current_avatar
                 })
-                st.rerun()
+                # 💡 次の操作（ボタン押しや次の入力）があるまで、ここでStreamlitの実行を完全にストップさせる
                 
             except Exception as e:
                 st.error(f"AI通信エラー: {e}")
