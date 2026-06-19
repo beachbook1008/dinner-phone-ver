@@ -385,9 +385,7 @@ if not df_menu.empty:
 else:
     st.error("メニューデータ（dinner_list.csv）が読み込めていないため、夜ご飯の提案ができません。")
 
-# --- 6. 自動挨拶（アバター切り替え対応版） ---
-st.divider()
-
+# --- 6. 自動挨拶（アバター切り替え対応版）とアバター変数定義 ---
 if "高木先生" in ai_persona:
     current_avatar = takagi_avatar
     bubble_class = "chat-bubble takagi-bubble"
@@ -397,6 +395,8 @@ elif "雷さん" in ai_persona:
 else:
     current_avatar = "🤖"
     bubble_class = "chat-bubble"
+
+st.divider()
 
 with st.chat_message("assistant", avatar=current_avatar):
     if "高木先生" in ai_persona:
@@ -417,8 +417,8 @@ with st.chat_message("assistant", avatar=current_avatar):
     st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 
 # --- 7.5 朝昼夕の合計摂取カロリー表示 ---
-breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum()
-lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum()
+breakfast_cal = df_menu[df_menu['display'].isin(b_items)]['cal'].sum() if not df_menu.empty else 0
+lunch_cal = df_menu[df_menu['display'].isin(l_items)]['cal'].sum() if not df_menu.empty else 0
 dinner_selected_cal = st.session_state['selected_dinner_cal']
 total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 
@@ -488,20 +488,39 @@ with chart_col2:
     ax.axis('equal')  
     st.pyplot(fig)
 
+# --- 8. AI相談室 ---
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+if "高木先生" in ai_persona:
+    chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
+elif "フォーマル" in ai_persona:
+    chat_placeholder = "AIアシスタントに論理的な相談をする"
+else:
+    chat_placeholder = "雷さんに相談"
+
+col_chat1, col_chat2 = st.columns([4, 1])
+with col_chat2:
+    if st.button("履歴クリア", use_container_width=True):
+        st.session_state.chat_history = []
+        st.rerun()
+
+# 過去のチャット履歴を画面に描画
+for msg in st.session_state.chat_history:
+    with st.chat_message(msg["role"], avatar=msg["avatar"]):
+        st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
+
+# ユーザーの新規入力判定
 if user_msg := st.chat_input(chat_placeholder):
-    # 1. ユーザーの入力を履歴に追加
     st.session_state.chat_history.append({
         "role": "user",
         "content": user_msg,
         "class": "chat-bubble user-bubble",
         "avatar": "👤"
     })
-    
-    # 💡 内部的な処理（API通信など）を行う前に、一度画面をリライトして
-    # ユーザーのメッセージを即座にチャット画面に表示・同期させます
     st.rerun()
 
-# ユーザーが直前に入力し、まだAIの返答がない場合の処理
+# 状態駆動：直前の入力がユーザーのものであればAIが応答を生成
 if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] == "user":
     latest_user_msg = st.session_state.chat_history[-1]["content"]
     
@@ -539,23 +558,12 @@ if st.session_state.chat_history and st.session_state.chat_history[-1]["role"] =
             try:
                 response = model.generate_content(prompt)
                 
-                if "高木先生" in ai_persona:
-                    bubble_class = "chat-bubble takagi-bubble"
-                elif "雷さん" in ai_persona:
-                    bubble_class = "chat-bubble rai-bubble"
-                else:
-                    bubble_class = "chat-bubble"
-                
-                # 2. AIの応答を履歴に追加
                 st.session_state.chat_history.append({
                     "role": "assistant",
                     "content": response.text,
                     "class": bubble_class,
                     "avatar": current_avatar
                 })
-                
-                # 💡 履歴に追加したため、再度 rerun することで
-                # 上記の履歴描画ループ（for msg in st.session_state.chat_history）によって綺麗に再描画されます
                 st.rerun()
                 
             except Exception as e:
