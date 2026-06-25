@@ -2,10 +2,10 @@ import time
 import hashlib
 import streamlit as st
 import pandas as pd
-import google.generativeai as genai
 import os
 from datetime import datetime
 from dotenv import load_dotenv
+from openai import OpenAI  # 💡 Groq通信用のライブラリ
 
 # --- アバター・画像の存在チェック ---
 takagi_avatar = "takagi.jpg" if os.path.exists("takagi.jpg") else "👨‍🏫"
@@ -16,16 +16,17 @@ takagi_rai_img = "takagirai.jpg" if os.path.exists("takagirai.jpg") else None
 # --- 1. 初期設定 ---
 load_dotenv()
 
-# 💡 Secretsを最優先に読み込む
-api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
+# 💡 SecretsからGroqのAPIキーを最優先に読み込む
+groq_api_key = st.secrets.get("GROQ_API_KEY", os.getenv("GROQ_API_KEY"))
 
-if api_key:
-    genai.configure(api_key=api_key, transport="rest")
-    
-    # 💡 万が一 2.0-flash でエラーが続く場合は、ここを "gemini-1.5-flash" に変更すると安定しやすいです
-    model = genai.GenerativeModel("gemini-2.0-flash")
+if groq_api_key:
+    # OpenAIの規格を利用してGroqの高速サーバーに接続
+    client = OpenAI(
+        api_key=groq_api_key,
+        base_url="https://api.groq.com/openai/v1"
+    )
 else:
-    st.error("APIキーがないよ！")
+    st.error("GroqのAPIキー（GROQ_API_KEY）がシークレットまたは環境変数に見つかりません！")
     st.stop()
 
 import style
@@ -92,7 +93,6 @@ def save_user(user_id, password, target_weight=None, consecutive_days=None, is_p
         try:
             import requests
             import json
-            # 💡 空文字やNaNでデータが壊れるのを防ぐコピー処理
             clean_df = df.copy()
             clean_df = clean_df.replace({pd.NA: "", None: ""}).fillna("")
             
@@ -375,7 +375,7 @@ if not df_menu.empty:
 else:
     st.error("メニューデータ（dinner_list.csv）が読み込めていないため、夜ご飯の提案ができません。")
 
-# --- 6. 自動挨拶（アバター切り替え対応版）とアバター変数定義 ---
+# --- 6. 自動挨拶（アバター切り替え対応版） ---
 if "高木先生" in ai_persona:
     current_avatar = takagi_avatar
     bubble_class = "chat-bubble takagi-bubble"
@@ -398,7 +398,7 @@ with st.chat_message("assistant", avatar=current_avatar):
             msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
     else:
         if dinner_cal > 500:
-            msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行こうよ！"
+            msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
         elif dinner_cal > 0:
             msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
         else:
@@ -478,7 +478,7 @@ with chart_col2:
     ax.axis('equal')  
     st.pyplot(fig)
 
-# --- 8. AI相談室 ---
+# --- 8. AI相談室 (Groq API 移行版) ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
@@ -495,14 +495,13 @@ with col_chat2:
         st.session_state.chat_history = []
         st.rerun()
 
-# 1. 過去の履歴をまず描画する
+# 1. 過去のチャット履歴の描画
 for msg in st.session_state.chat_history:
     with st.chat_message(msg["role"], avatar=msg["avatar"]):
         st.markdown(f'<div class="{msg["class"]}">{msg["content"]}</div>', unsafe_allow_html=True)
 
-# 2. 新しい入力があった時の処理（★ここに st.rerun() は絶対に入れない）
+# 2. ユーザーの新しい入力処理
 if user_msg := st.chat_input(chat_placeholder):
-    # ユーザーのセリフをその場で描画＆履歴に追加
     with st.chat_message("user", avatar="👤"):
         st.markdown(f'<div class="chat-bubble user-bubble">{user_msg}</div>', unsafe_allow_html=True)
     
@@ -513,7 +512,7 @@ if user_msg := st.chat_input(chat_placeholder):
         "avatar": "👤"
     })
 
-    # その流れのまま、待たせることなくAPIを「1回だけ」叩く
+    # Groq APIへのリクエスト処理
     with st.chat_message("assistant", avatar=current_avatar):
         current_status = f"""
 [User Status Context]
@@ -531,41 +530,35 @@ if user_msg := st.chat_input(chat_placeholder):
         except Exception:
             sys_prompt = "あなたは論理的で丁寧なAIアシスタントです。"
 
-        context_reminder = "[Important Note: Please keep your response short and sweet!]"
-        prompt = f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}\n\nUser Question: {user_msg}"
+        # 💡 タコ（たこ焼き）を検知した場合の高木先生の拒否プロンプトを念押し補強
+        if "高木先生" in ai_persona and any(x in user_msg or x in str(st.session_state['selected_dinner']) for x in ["タコ", "たこ", "tako", "Octopus"]):
+            sys_prompt += "\n【CRITICAL WARNING】ユーザーからタコ（たこ焼き等）の話が出ました！全力で拒否し、別のヘルシーな投資（代替の食べ物）を英語を交えて提案してください！"
+
+        context_reminder = "[Important Note: Please keep your response short, sweet, and perfectly match your character persona!]"
         
-        with st.spinner("AIが回答を生成中..."):
+        with st.spinner("AIが爆速で回答を生成中..."):
             try:
-                # 💡 改善ポイント：429エラーやQuota制限が出た場合、自動で25秒待機して再試行する処理
-                max_retries = 3
-                retry_wait = 25
-                response = None
+                # 💡 無料枠で非常に軽快かつ賢い「llama-3.1-8b-instant」を指定
+                response = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {"role": "system", "content": f"{sys_prompt}\n\n{current_status}\n\n{context_reminder}"},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    temperature=0.75
+                )
                 
-                for attempt in range(max_retries):
-                    try:
-                        response = model.generate_content(prompt)
-                        break  # 成功したらループを抜ける
-                    except Exception as inner_e:
-                        error_str = str(inner_e).lower()
-                        # エラー内容に429やquotaが含まれていたら一時的な制限と判断して待機
-                        if "429" in error_str or "quota" in error_str or "exhausted" in error_str:
-                            if attempt < max_retries - 1:
-                                time.sleep(retry_wait)
-                            else:
-                                raise Exception("リクエスト上限のため、自動リトライに失敗しました。数十秒待ってから再度お試しください。")
-                        else:
-                            raise inner_e # その他のエラーはそのまま扱う
+                ai_response_text = response.choices[0].message.content
                 
-                if response:
-                    # 回答をその場で描画＆履歴に追加
-                    st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
-                    
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": response.text,
-                        "class": bubble_class,
-                        "avatar": current_avatar
-                    })
+                # 回答を画面に描画＆履歴に保存
+                st.markdown(f'<div class="{bubble_class}">{ai_response_text}</div>', unsafe_allow_html=True)
+                
+                st.session_state.chat_history.append({
+                    "role": "assistant",
+                    "content": ai_response_text,
+                    "class": bubble_class,
+                    "avatar": current_avatar
+                })
                 
             except Exception as e:
-                st.error(f"AI通信エラー: {e}")
+                st.error(f"Groq API通信エラーが発生しました: {e}\nAPIキーが正しくセットされているか確認してください。")
