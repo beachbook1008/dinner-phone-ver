@@ -7,3 +7,4 @@ matplotlib
 google-search-results
 requests
 beautifulsoup4
+openai
