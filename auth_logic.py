@@ -22,6 +22,7 @@ api_key = st.secrets.get("GEMINI_API_KEY", os.getenv("GEMINI_API_KEY"))
 if api_key:
     genai.configure(api_key=api_key, transport="rest")
     
+    # 💡 万が一 2.0-flash でエラーが続く場合は、ここを "gemini-1.5-flash" に変更すると安定しやすいです
     model = genai.GenerativeModel("gemini-2.0-flash")
 else:
     st.error("APIキーがないよ！")
@@ -535,18 +536,36 @@ if user_msg := st.chat_input(chat_placeholder):
         
         with st.spinner("AIが回答を生成中..."):
             try:
-                response = model.generate_content(prompt)
+                # 💡 改善ポイント：429エラーやQuota制限が出た場合、自動で25秒待機して再試行する処理
+                max_retries = 3
+                retry_wait = 25
+                response = None
                 
-                # 回答をその場で描画＆履歴に追加
-                st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
+                for attempt in range(max_retries):
+                    try:
+                        response = model.generate_content(prompt)
+                        break  # 成功したらループを抜ける
+                    except Exception as inner_e:
+                        error_str = str(inner_e).lower()
+                        # エラー内容に429やquotaが含まれていたら一時的な制限と判断して待機
+                        if "429" in error_str or "quota" in error_str or "exhausted" in error_str:
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_wait)
+                            else:
+                                raise Exception("リクエスト上限のため、自動リトライに失敗しました。数十秒待ってから再度お試しください。")
+                        else:
+                            raise inner_e # その他のエラーはそのまま扱う
                 
-                st.session_state.chat_history.append({
-                    "role": "assistant",
-                    "content": response.text,
-                    "class": bubble_class,
-                    "avatar": current_avatar
-                })
-                # 💡 次の操作（ボタン押しや次の入力）があるまで、ここでStreamlitの実行を完全にストップさせる
+                if response:
+                    # 回答をその場で描画＆履歴に追加
+                    st.markdown(f'<div class="{bubble_class}">{response.text}</div>', unsafe_allow_html=True)
+                    
+                    st.session_state.chat_history.append({
+                        "role": "assistant",
+                        "content": response.text,
+                        "class": bubble_class,
+                        "avatar": current_avatar
+                    })
                 
             except Exception as e:
                 st.error(f"AI通信エラー: {e}")
