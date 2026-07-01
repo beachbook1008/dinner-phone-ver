@@ -269,7 +269,13 @@ if pd.isna(user_row['target_weight']) or (datetime.now().day == 1 and last_updat
     st.title(f"📅 目標設定 ({user_id})")
     t_w = st.number_input("今月の目標体重 (kg)", 30.0, 150.0, 52.0)
     if st.button("目標を保存"):
-        save_user(user_id, user_row['password'], t_w, is_password_hashed=True)
+        # 💡 引数がズレないように名前付き（キーワード引数）で安全に保存します
+        save_user(
+            user_id=user_id, 
+            password=user_row['password'], 
+            target_weight=t_w, 
+            is_password_hashed=True
+        )
         st.rerun()
     st.stop()
 
