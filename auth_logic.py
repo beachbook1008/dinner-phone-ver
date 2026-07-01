@@ -66,26 +66,24 @@ def get_all_users():
     return pd.DataFrame(columns=cols)
 
 def save_user(user_id, password, target_weight=None, consecutive_days=None, is_password_hashed=False):
-    df = get_all_users()
     u_str = str(user_id)
     stored_password = password
+    
+    
+    # 生のパスワード（新規登録時など）で、まだハッシュ化されていない場合（False）だけハッシュ化する。
+    # ログイン中の更新などで、すでにハッシュ化済みの場合は（True）そのままスルーする。
     if password and not is_password_hashed:
         stored_password = hash_password(password)
-        
-    if u_str in df['user_id'].astype(str).values:
-        idx = df[df['user_id'].astype(str) == u_str].index[0]
-        if password:
-            df.at[idx, 'password'] = stored_password
-        if target_weight is not None:
-            df.at[idx, 'target_weight'] = target_weight
-            df.at[idx, 'last_update'] = datetime.now().strftime("%Y-%m-%d")
-        if consecutive_days is not None:
-            df.at[idx, 'consecutive_days'] = consecutive_days
-    else:
-        new_row = pd.DataFrame({"user_id": [user_id], "password": [stored_password], "target_weight": [target_weight], "last_update": [datetime.now().strftime("%Y-%m-%d")], "consecutive_days": [consecutive_days or 1]})
-        df = pd.concat([df, new_row], ignore_index=True)
-        
-    df.to_csv(USER_FILE, index=False)
+    
+    # --- ここから下をスプレッドシート（API）の書き込み処理に書き換える ---
+    # (例: 既存のユーザーがいればその行を更新、いなければ新しい行を追加する)
+    
+    # 【スプレッドシートに保存するデータのイメージ】
+    # user_id          -> u_str
+    # password         -> stored_password (ここを二重ハッシュ化させない！)
+    # target_weight    -> target_weight (指定があれば更新、なければ既存のまま)
+    # last_update      -> datetime.now().strftime("%Y-%m-%d")
+    # consecutive_days -> consecutive_days (指定があれば更新)
     
     if "db_backup_url" not in st.secrets:
         pass 
@@ -222,7 +220,13 @@ if not st.session_state['is_logged_in']:
                         user_info = match.iloc[0]
                         reset_basic_info_on_month_start(l_id)
                         consecutive_days = calculate_consecutive_days(l_id)
-                        save_user(l_id, user_info['password'], user_info['target_weight'], consecutive_days, is_password_hashed=True)
+                        save_user(
+                            user_id=l_id, 
+                            password=user_info['password'], 
+                            target_weight=user_info['target_weight'], 
+                            consecutive_days=consecutive_days, 
+                            is_password_hashed=True
+                        )
                         st.session_state['height'] = float(user_info.get('height', 160.0))
                         st.session_state['weight'] = float(user_info.get('weight', 55.0))
                         st.session_state['age'] = int(user_info.get('age', 20))
@@ -255,7 +259,13 @@ user_row = match_users.iloc[0] if not match_users.empty else pd.Series({"user_id
 df_menu = load_menu()
 
 # C. 目標設定画面
-if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
+#if pd.isna(user_row['target_weight']) or datetime.now().day == 1:
+
+today_str = datetime.now().strftime("%Y-%m-%d")
+last_update_str = str(user_row.get('last_update', ''))
+
+# 「目標が空っぽ」または「今日が1日、かつ、今日まだ更新していない（日をまたいで起動しっぱなしの場合など）」
+if pd.isna(user_row['target_weight']) or (datetime.now().day == 1 and last_update_str != today_str):
     st.title(f"📅 目標設定 ({user_id})")
     t_w = st.number_input("今月の目標体重 (kg)", 30.0, 150.0, 52.0)
     if st.button("目標を保存"):
