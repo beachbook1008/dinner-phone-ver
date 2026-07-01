@@ -66,24 +66,33 @@ def get_all_users():
     return pd.DataFrame(columns=cols)
 
 def save_user(user_id, password, target_weight=None, consecutive_days=None, is_password_hashed=False):
+    df = get_all_users()
     u_str = str(user_id)
     stored_password = password
     
-    
-    # 生のパスワード（新規登録時など）で、まだハッシュ化されていない場合（False）だけハッシュ化する。
-    # ログイン中の更新などで、すでにハッシュ化済みの場合は（True）そのままスルーする。
     if password and not is_password_hashed:
         stored_password = hash_password(password)
-    
-    # --- ここから下をスプレッドシート（API）の書き込み処理に書き換える ---
-    # (例: 既存のユーザーがいればその行を更新、いなければ新しい行を追加する)
-    
-    # 【スプレッドシートに保存するデータのイメージ】
-    # user_id          -> u_str
-    # password         -> stored_password (ここを二重ハッシュ化させない！)
-    # target_weight    -> target_weight (指定があれば更新、なければ既存のまま)
-    # last_update      -> datetime.now().strftime("%Y-%m-%d")
-    # consecutive_days -> consecutive_days (指定があれば更新)
+        
+    if u_str in df['user_id'].astype(str).values:
+        idx = df[df['user_id'].astype(str) == u_str].index[0]
+        if password and not is_password_hashed:
+            df.at[idx, 'password'] = stored_password
+        if target_weight is not None:
+            df.at[idx, 'target_weight'] = target_weight
+            df.at[idx, 'last_update'] = datetime.now().strftime("%Y-%m-%d")
+        if consecutive_days is not None:
+            df.at[idx, 'consecutive_days'] = consecutive_days
+    else:
+        new_row = pd.DataFrame({
+            "user_id": [user_id], 
+            "password": [stored_password], 
+            "target_weight": [target_weight], 
+            "last_update": [datetime.now().strftime("%Y-%m-%d")], 
+            "consecutive_days": [consecutive_days or 1]
+        })
+        df = pd.concat([df, new_row], ignore_index=True)
+        
+    df.to_csv(USER_FILE, index=False)
     
     if "db_backup_url" not in st.secrets:
         pass 
