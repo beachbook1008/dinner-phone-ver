@@ -323,7 +323,7 @@ with st.sidebar:
     st.header(" 発表用AI設定")
     ai_persona = st.selectbox(
         "AIのキャラクター",
-        ["雷さん", "高木先生モード", "フォーマル"]
+        ["雷さん", "高木先生モード","安藤先生モード" ,"フォーマル"]
     )
     
     if st.button("ログアウト"):
