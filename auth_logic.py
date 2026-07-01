@@ -509,10 +509,12 @@ if "chat_history" not in st.session_state:
 
 if "高木先生" in ai_persona:
     chat_placeholder = "高木先生にWeb3やダイエットの相談をする"
+elif "安藤先生" in ai_persona:
+    chat_placeholder = "安藤先生にPythonや統計検定３級の相談をする"
 elif "フォーマル" in ai_persona:
     chat_placeholder = "AIアシスタントに論理的な相談をする"
 else:
-    chat_placeholder = "雷さんに相談"
+    chat_placeholder = "雷に相談"
 
 col_chat1, col_chat2 = st.columns([4, 1])
 with col_chat2:
