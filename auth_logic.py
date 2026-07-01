@@ -438,71 +438,19 @@ dinner_selected_cal = st.session_state['selected_dinner_cal']
 total_cal = breakfast_cal + lunch_cal + dinner_selected_cal
 
 st.markdown("---")
-st.subheader("📊 本日の栄養摂取状況とバランス")
+st.subheader("📊 本日の栄養摂取状況")
 
-chart_col1, chart_col2 = st.columns([1, 1])
-
-with chart_col1:
-    with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.metric(label="🌅 朝食", value=f"{int(breakfast_cal)} kcal")
-            st.metric(label="🌙 夕食", value=f"{int(dinner_selected_cal)} kcal")
-        with c2:
-            st.metric(label="☀️ 昼食", value=f"{int(lunch_cal)} kcal")
-            st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
-
-with chart_col2:
-    left_cal = max(0, int(dinner_cal)) if 'dinner_cal' in locals() else 0
-    raw_labels = ['朝食', '昼食', '夕食', '残り枠']
-    raw_sizes = [breakfast_cal, lunch_cal, dinner_selected_cal, left_cal]
-    raw_colors = ['#ffa500', '#4CAF50', '#2196F3', '#e0e0e0']
-    
-    labels = []
-    sizes = []
-    colors = []
-    for s, l, c in zip(raw_sizes, raw_labels, raw_colors):
-        if s > 0:
-            labels.append(l)
-            sizes.append(s)
-            colors.append(c)
-            
-    if len(sizes) == 0:
-        sizes = [100]
-        labels = ['1日の目標枠']
-        colors = ['#e0e0e0']
-    
-    import matplotlib.pyplot as plt
-    import matplotlib.font_manager as fm
-    import urllib.request
-
-    font_url = "https://github.com/googlefonts/morisawa-biz-ud-gothic/raw/main/fonts/ttf/BIZUDGothic-Regular.ttf"
-    font_path = "BIZUDGothic-Regular.ttf"
-    if not os.path.exists(font_path):
-        try:
-            urllib.request.urlretrieve(font_url, font_path)
-        except:
-            pass
-            
-    if os.path.exists(font_path):
-        fp = fm.FontProperties(fname=font_path)
-    else:
-        fp = fm.FontProperties(family='sans-serif')
-    
-    fig, ax = plt.subplots(figsize=(4, 4))
-    wedges, texts, autotexts = ax.pie(
-        sizes, 
-        labels=labels, 
-        autopct=lambda p: '{:.1f}%'.format(p) if p > 0 else '', 
-        startangle=90, 
-        colors=colors,
-        textprops={'color': "black", 'size': 9, 'fontproperties': fp}, 
-        wedgeprops=dict(width=0.4, edgecolor='white')
-    )
-    plt.setp(autotexts, size=8, weight="bold", fontproperties=fp)
-    ax.axis('equal')  
-    st.pyplot(fig)
-
+with st.container(border=True):
+    # グラフを消した分、4列にして数値をスッキリ横並びに配置
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric(label="🌅 朝食", value=f"{int(breakfast_cal)} kcal")
+    with c2:
+        st.metric(label="☀️ 昼食", value=f"{int(lunch_cal)} kcal")
+    with c3:
+        st.metric(label="🌙 夕食", value=f"{int(dinner_selected_cal)} kcal")
+    with c4:
+        st.metric(label="🔥 合計摂取", value=f"{int(total_cal)} kcal")
 # --- 8. AI相談室 (Groq API 移行版) ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
