@@ -420,14 +420,14 @@ with st.chat_message("assistant", avatar=current_avatar):
         elif dinner_cal > 0:
             msg = f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！"
         else:
-            msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
+            msg = f"Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
     else:
         if dinner_cal > 500:
             msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
         elif dinner_cal > 0:
             msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
         else:
-            msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
+            msg = f"ウチとダイエットがんばろ！火鍋行こう！！！"
             
     st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 
