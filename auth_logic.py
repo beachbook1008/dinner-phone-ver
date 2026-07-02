@@ -363,23 +363,7 @@ if b_items or l_items:
 
 dinner_cal = target_cal - (df_menu[df_menu['display'].isin(b_items)]['cal'].sum() + df_menu[df_menu['display'].isin(l_items)]['cal'].sum())
 st.metric("今日の残り枠", f"{int(dinner_cal)} kcal")
-# --- 🚨 低体重・カロリー不足アラート機能 ---
-if height > 0:
-    bmi = weight / ((height / 100) ** 2)
-    if bmi < 18.5:
-        if "高木先生" in ai_persona:
-            st.error(f"🚨 **高木先生からの緊急アラート:** BMIが {bmi:.1f} と非常に低く、過度な減量リスク（資産毀損）があります！直ちにウェイトコントロールのポートフォリオを見直し、健康への『先行投資』を増やしてください！")
-        elif "安藤先生" in ai_persona:
-            st.error(f"🚨 **安藤先生からの指摘:** BMIが {bmi:.1f} です。統計的にもこれは明らかに『低体重（外れ値）』の領域に入っていますよ。これ以上の食事制限はロジックが破綻しています。まずは適切な栄養摂取のコード（食事）を実行してください。インデントのズレくらい容認できません！")
-        else:
-            st.error(f"🚨 **雷さんからの怒りのアラート:** ちょっと彩音、BMIが {bmi:.1f} しかないよ！？これ以上痩せたらマジで怒るからね！ちゃんと食べて！")
 
-# 2. 極端なカロリー不足のチェック
-if dinner_cal < 300:
-    if "安藤先生" in ai_persona:
-        st.warning(f"⚠️ **安藤先生からの警告:** 残り許容カロリーが {int(dinner_cal)} kcal と少なすぎます。基礎代謝（BMR）の分散を考慮しない極端な制限は、体調不良という致命的なランタイムエラーを引き起こしますよ。")
-    else:
-        st.warning("⚠️ **健康管理警告:** 本日の残り許容カロリーが少なすぎます。基礎代謝を下回る極端な制限はリバウンドや体調不良の原因になります。")
 st.markdown("---")
 st.subheader("🌙 夜ご飯の提案と選択")
 
@@ -436,14 +420,14 @@ with st.chat_message("assistant", avatar=current_avatar):
         elif dinner_cal > 0:
             msg = f"順調にコントロールできていますね. Excellent！{user_id}さんの毎日の努力は素晴らしい asset（資産）になりますよ. この調子で頑張りましょう！"
         else:
-            msg = f"Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
+            msg = f"Oh... カロリーオーバーしてしまいましたね. でも大丈夫ですよ！Don't worry. 明日の朝からまたメタバースのように新しい気持ちで、ウェイトコントロールに投資していきましょう！"
     else:
         if dinner_cal > 500:
             msg = f"あったまいいね！今日はまだ {int(dinner_cal)}kcal も余裕があるね。美味しいもの探しに行おうよ！"
         elif dinner_cal > 0:
             msg = f"今のところ順調。夜は控えめな美食を楽しんで！"
         else:
-            msg = f"今日もがんばっていこ！"
+            msg = f"ちょっと！もうカロリーオーバー！明日は食べすぎ禁止ね！"
             
     st.markdown(f'<div class="{bubble_class}">{msg}</div>', unsafe_allow_html=True)
 
